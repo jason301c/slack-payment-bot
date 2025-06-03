@@ -32,6 +32,7 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
 
 ### Credentials Setup (used for server)
  - Go to Stripe's [dashboard](https://dashboard.stripe.com) and copy the **Secret Key** from the API section. This key will be used to create payment links.
+ - For Stripe, you need *Payment Links (write)*, *Products (write)*, and *Features (write)*.
 
  - Go to Airwallex's dashboard and create a **Restricted API key** with permissions to create links. This will be used to generate payment links.
 
