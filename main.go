@@ -100,7 +100,7 @@ func parseCommandArguments(text string) (*PaymentLinkData, error) {
 
 // handleSlackCommands processes incoming Slack slash command requests.
 func handleSlackCommands(w http.ResponseWriter, r *http.Request) {
-	verifier, err := slack.NewVerifier(r.Header, slackSigningSecret)
+	verifier, err := slack.NewSecretsVerifier(r.Header, slackSigningSecret)
 	if err != nil {
 		log.Printf("Error creating verifier: %v", err)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -145,9 +145,13 @@ func handleSlackCommands(w http.ResponseWriter, r *http.Request) {
 
 	// Send an immediate response to Slack
 	w.Header().Set("Content-Type", "application/json")
-	resp := slack.SlashCommandResponse{
+	type slackResponse struct {
+		Text         string `json:"text"`
+		ResponseType string `json:"response_type"`
+	}
+	resp := slackResponse{
 		Text:         responseText,
-		ResponseType: slack.ResponseTypeInChannel, // Make the response visible to everyone in the channel
+		ResponseType: "in_channel", // or "ephemeral"
 	}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Printf("Error encoding response: %v", err)

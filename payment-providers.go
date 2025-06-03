@@ -2,13 +2,11 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/stripe/stripe-go/v82"
@@ -16,32 +14,6 @@ import (
 	"github.com/stripe/stripe-go/v82/price"
 	"github.com/stripe/stripe-go/v82/product"
 )
-
-var (
-	stripeApiKey      string
-	airwallexClientId string
-	airwallexApiKey   string
-	airwallexBaseUrl  string
-)
-
-func init() {
-	stripeApiKey = os.Getenv("STRIPE_API_KEY")
-	airwallexClientId = os.Getenv("AIRWALLEX_CLIENT_ID")
-	airwallexApiKey = os.Getenv("AIRWALLEX_API_KEY")
-	airwallexBaseUrl = os.Getenv("AIRWALLEX_BASE_URL")
-	if stripeApiKey == "" {
-		log.Fatal("STRIPE_API_KEY environment variable not set.")
-	}
-	if airwallexClientId == "" {
-		log.Fatal("AIRWALLEX_CLIENT_ID environment variable not set.")
-	}
-	if airwallexApiKey == "" {
-		log.Fatal("AIRWALLEX_API_KEY environment variable not set.")
-	}
-	if airwallexBaseUrl == "" {
-		airwallexBaseUrl = "https://api-demo.airwallex.com" // Default to demo
-	}
-}
 
 // GenerateAirwallexLink creates a real Airwallex payment link using their API.
 func GenerateAirwallexLink(data *PaymentLinkData) string {
@@ -111,7 +83,6 @@ func createAirwallexPaymentLink(token string, data *PaymentLinkData) (string, er
 // GenerateStripeLink creates a real Stripe payment link using the Stripe Go SDK.
 func GenerateStripeLink(data *PaymentLinkData) string {
 	stripe.Key = stripeApiKey
-	ctx := context.Background()
 	productParams := &stripe.ProductParams{
 		Name: stripe.String(data.ServiceName),
 	}
