@@ -52,11 +52,11 @@ func getAirwallexToken() (string, error) {
 // createAirwallexPaymentLink creates a payment link via Airwallex API.
 func createAirwallexPaymentLink(token string, data *PaymentLinkData) (string, error) {
 	body := map[string]interface{}{
-		"amount":            data.Amount,
-		"currency":          "USD",
-		"merchant_order_id": data.ReferenceNumber,
-		"request_id":        fmt.Sprintf("slackbot-%d", time.Now().UnixNano()),
-		"description":       data.ServiceName,
+		"amount":      data.Amount,
+		"currency":    "USD",
+		"title":       data.ServiceName,
+		"description": data.ReferenceNumber,
+		"request_id":  fmt.Sprintf("slackbot-%d", time.Now().UnixNano()),
 	}
 	b, _ := json.Marshal(body)
 	req, err := http.NewRequest("POST", airwallexBaseUrl+"/api/v1/pa/payment_links/create", bytes.NewReader(b))
