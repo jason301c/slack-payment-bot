@@ -19,9 +19,10 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
    - Usage hint: `[amount] [service_name] [reference_number]`
 
 3. **Install the App to Your Workspace**
-   - Go to **Settings > Basic Information**.
-   - Click "Install to Workspace" and grant permissions.
+   - Go to **Settings > Install App**.
+   - Click "Install to YOUR COMPANY" and grant permissions.
    - Copy your **Bot User OAuth Token** and **Signing Secret** (you'll need to provide these to the server/bot operator).
+   - (Note that the signing secret is from **Settings > Basic Information**).
 
 4. **Share Credentials**
    - Provide the following to the person running the bot:

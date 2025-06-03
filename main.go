@@ -50,15 +50,15 @@ func init() {
 	if stripeApiKey == "" {
 		log.Fatal("STRIPE_API_KEY environment variable not set.")
 	}
-	if airwallexClientId == "" {
-		log.Fatal("AIRWALLEX_CLIENT_ID environment variable not set.")
-	}
-	if airwallexApiKey == "" {
-		log.Fatal("AIRWALLEX_API_KEY environment variable not set.")
-	}
-	if airwallexBaseUrl == "" {
-		airwallexBaseUrl = "https://api-demo.airwallex.com" // Default to demo
-	}
+	// if airwallexClientId == "" {
+	// 	log.Fatal("AIRWALLEX_CLIENT_ID environment variable not set.")
+	// }
+	// if airwallexApiKey == "" {
+	// 	log.Fatal("AIRWALLEX_API_KEY environment variable not set.")
+	// }
+	// if airwallexBaseUrl == "" {
+	// 	airwallexBaseUrl = "https://api-demo.airwallex.com" // Default to demo
+	// }
 
 	// Initialize the Slack API client
 	api = slack.New(slackBotToken)
