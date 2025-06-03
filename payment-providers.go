@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/stripe/stripe-go/v82"
@@ -37,24 +36,36 @@ func GenerateAirwallexLink(data *PaymentLinkData) string {
 // getAirwallexToken authenticates and returns a bearer token.
 func getAirwallexToken() (string, error) {
 	log.Printf("[Airwallex] Authenticating with client_id=%s, api_key=%s, base_url=%s", airwallexClientId, airwallexApiKey, airwallexBaseUrl)
-	form := url.Values{}
-	form.Set("x-client-id", airwallexClientId)
-	form.Set("x-api-key", airwallexApiKey)
-	resp, err := http.PostForm(airwallexBaseUrl+"/api/v1/authentication/login", form)
+	url := airwallexBaseUrl + "/api/v1/authentication/login"
+	body := []byte(`{}`)
+	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
 	if err != nil {
-		log.Printf("[Airwallex] Error posting auth form: %v", err)
+		log.Printf("[Airwallex] Error creating auth request: %v", err)
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-client-id", airwallexClientId)
+	req.Header.Set("x-api-key", airwallexApiKey)
+	log.Printf("[Airwallex] Sending auth request to %s with headers: x-client-id=%s, x-api-key=%s", url, airwallexClientId, airwallexApiKey)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[Airwallex] Error posting auth request: %v", err)
 		return "", err
 	}
 	defer resp.Body.Close()
 	log.Printf("[Airwallex] Auth response status: %s", resp.Status)
+	respBody, _ := io.ReadAll(resp.Body)
+	log.Printf("[Airwallex] Auth response body: %s", string(respBody))
 	var result struct {
-		Token string `json:"token"`
+		Token     string `json:"token"`
+		ExpiresAt string `json:"expires_at"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		log.Printf("[Airwallex] Error decoding auth response: %v", err)
 		return "", err
 	}
-	log.Printf("[Airwallex] Received token: %s", result.Token)
+	log.Printf("[Airwallex] Received token: %s, expires_at: %s", result.Token, result.ExpiresAt)
 	return result.Token, nil
 }
 
