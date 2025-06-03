@@ -77,6 +77,7 @@ func createAirwallexPaymentLink(token string, data *PaymentLinkData) (string, er
 		"title":       data.ServiceName,
 		"description": data.ReferenceNumber,
 		"reference":   fmt.Sprintf("slackbot-%d", time.Now().UnixNano()),
+		"reusable":    false,
 	}
 	b, _ := json.Marshal(body)
 	log.Printf("[Airwallex] Creating payment link with body: %s", string(b))
