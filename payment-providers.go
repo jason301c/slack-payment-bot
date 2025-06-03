@@ -38,8 +38,8 @@ func GenerateAirwallexLink(data *PaymentLinkData) string {
 func getAirwallexToken() (string, error) {
 	log.Printf("[Airwallex] Authenticating with client_id=%s, api_key=%s, base_url=%s", airwallexClientId, airwallexApiKey, airwallexBaseUrl)
 	form := url.Values{}
-	form.Set("client_id", airwallexClientId)
-	form.Set("api_key", airwallexApiKey)
+	form.Set("x-client-id", airwallexClientId)
+	form.Set("x-api-key", airwallexApiKey)
 	resp, err := http.PostForm(airwallexBaseUrl+"/api/v1/authentication/login", form)
 	if err != nil {
 		log.Printf("[Airwallex] Error posting auth form: %v", err)
