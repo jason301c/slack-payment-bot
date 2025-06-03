@@ -84,7 +84,8 @@ func createAirwallexPaymentLink(token string, data *PaymentLinkData) (string, er
 func GenerateStripeLink(data *PaymentLinkData) string {
 	stripe.Key = stripeApiKey
 	productParams := &stripe.ProductParams{
-		Name: stripe.String(data.ServiceName),
+		Name:        stripe.String(data.ServiceName),
+		Description: stripe.String(data.ReferenceNumber),
 	}
 	product, err := product.New(productParams)
 	if err != nil {
@@ -108,8 +109,8 @@ func GenerateStripeLink(data *PaymentLinkData) string {
 				Quantity: stripe.Int64(1),
 			},
 		},
-		Metadata: map[string]string{
-			"reference": data.ReferenceNumber,
+		PaymentIntentData: &stripe.PaymentLinkPaymentIntentDataParams{
+			SetupFutureUsage: stripe.String("off_session"),
 		},
 	}
 	link, err := paymentlink.New(params)
