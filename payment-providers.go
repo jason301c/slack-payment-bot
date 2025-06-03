@@ -56,7 +56,7 @@ func createAirwallexPaymentLink(token string, data *PaymentLinkData) (string, er
 		"currency":    "USD",
 		"title":       data.ServiceName,
 		"description": data.ReferenceNumber,
-		"request_id":  fmt.Sprintf("slackbot-%d", time.Now().UnixNano()),
+		"reference":   fmt.Sprintf("slackbot-%d", time.Now().UnixNano()),
 	}
 	b, _ := json.Marshal(body)
 	req, err := http.NewRequest("POST", airwallexBaseUrl+"/api/v1/pa/payment_links/create", bytes.NewReader(b))
