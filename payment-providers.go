@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -17,35 +18,43 @@ import (
 
 // GenerateAirwallexLink creates a real Airwallex payment link using their API.
 func GenerateAirwallexLink(data *PaymentLinkData) string {
+	log.Printf("[Airwallex] GenerateAirwallexLink called with: %+v", data)
 	token, err := getAirwallexToken()
 	if err != nil {
-		log.Printf("Airwallex auth error: %v", err)
+		log.Printf("[Airwallex] Auth error: %v", err)
 		return "[Airwallex auth error]"
 	}
+	log.Printf("[Airwallex] Got token: %s", token)
 	link, err := createAirwallexPaymentLink(token, data)
 	if err != nil {
-		log.Printf("Airwallex link error: %v", err)
+		log.Printf("[Airwallex] Link error: %v", err)
 		return "[Airwallex link error]"
 	}
+	log.Printf("[Airwallex] Successfully created payment link: %s", link)
 	return link
 }
 
 // getAirwallexToken authenticates and returns a bearer token.
 func getAirwallexToken() (string, error) {
+	log.Printf("[Airwallex] Authenticating with client_id=%s, api_key=%s, base_url=%s", airwallexClientId, airwallexApiKey, airwallexBaseUrl)
 	form := url.Values{}
 	form.Set("client_id", airwallexClientId)
 	form.Set("api_key", airwallexApiKey)
 	resp, err := http.PostForm(airwallexBaseUrl+"/api/v1/authentication/login", form)
 	if err != nil {
+		log.Printf("[Airwallex] Error posting auth form: %v", err)
 		return "", err
 	}
 	defer resp.Body.Close()
+	log.Printf("[Airwallex] Auth response status: %s", resp.Status)
 	var result struct {
 		Token string `json:"token"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		log.Printf("[Airwallex] Error decoding auth response: %v", err)
 		return "", err
 	}
+	log.Printf("[Airwallex] Received token: %s", result.Token)
 	return result.Token, nil
 }
 
@@ -59,8 +68,12 @@ func createAirwallexPaymentLink(token string, data *PaymentLinkData) (string, er
 		"reference":   fmt.Sprintf("slackbot-%d", time.Now().UnixNano()),
 	}
 	b, _ := json.Marshal(body)
-	req, err := http.NewRequest("POST", airwallexBaseUrl+"/api/v1/pa/payment_links/create", bytes.NewReader(b))
+	log.Printf("[Airwallex] Creating payment link with body: %s", string(b))
+	url := airwallexBaseUrl + "/api/v1/pa/payment_links/create"
+	log.Printf("[Airwallex] POST %s", url)
+	req, err := http.NewRequest("POST", url, bytes.NewReader(b))
 	if err != nil {
+		log.Printf("[Airwallex] Error creating request: %v", err)
 		return "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -68,15 +81,21 @@ func createAirwallexPaymentLink(token string, data *PaymentLinkData) (string, er
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
+		log.Printf("[Airwallex] Error making payment link request: %v", err)
 		return "", err
 	}
 	defer resp.Body.Close()
+	log.Printf("[Airwallex] Payment link response status: %s", resp.Status)
+	respBody, _ := io.ReadAll(resp.Body)
+	log.Printf("[Airwallex] Payment link response body: %s", string(respBody))
 	var result struct {
 		PaymentLinkUrl string `json:"url"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		log.Printf("[Airwallex] Error decoding payment link response: %v", err)
 		return "", err
 	}
+	log.Printf("[Airwallex] Received payment link: %s", result.PaymentLinkUrl)
 	return result.PaymentLinkUrl, nil
 }
 

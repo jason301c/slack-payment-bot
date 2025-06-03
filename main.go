@@ -137,6 +137,7 @@ func parseCommandArguments(text string) (*PaymentLinkData, error) {
 
 // handleSlackCommands processes incoming Slack slash command requests.
 func handleSlackCommands(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Received Slack command request: method=%s, url=%s, remote=%s", r.Method, r.URL.String(), r.RemoteAddr)
 	verifier, err := slack.NewSecretsVerifier(r.Header, slackSigningSecret)
 	if err != nil {
 		log.Printf("Error creating verifier: %v", err)
@@ -152,6 +153,8 @@ func handleSlackCommands(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("Parsed Slack command: command=%s, text=%s, user_id=%s, channel_id=%s", s.Command, s.Text, s.UserID, s.ChannelID)
+
 	if err = verifier.Ensure(); err != nil {
 		log.Printf("Error verifying request: %v", err)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -164,18 +167,25 @@ func handleSlackCommands(w http.ResponseWriter, r *http.Request) {
 	// Parse the command arguments
 	linkData, err := parseCommandArguments(s.Text)
 	if err != nil {
+		log.Printf("Argument parsing error for command '%s': %v (text: %s)", s.Command, err, s.Text)
 		responseText = fmt.Sprintf("Error: %s\nUsage: `/%s [amount] [service_name] [reference_number]`", err.Error(), s.Command[1:])
 	} else {
+		log.Printf("Parsed arguments: amount=%.2f, service_name=%s, reference_number=%s", linkData.Amount, linkData.ServiceName, linkData.ReferenceNumber)
 		switch s.Command {
 		case "/create-airwallex-link":
+			log.Printf("Generating Airwallex link for: %+v", linkData)
 			paymentLink = GenerateAirwallexLink(linkData)
+			log.Printf("Airwallex link result: %s", paymentLink)
 			responseText = fmt.Sprintf("Airwallex Payment Link for *%s*\nAmount: *$%.2f*\nReference: `%s`\nLink: <%s|Click here to pay>",
 				linkData.ServiceName, linkData.Amount, linkData.ReferenceNumber, paymentLink)
 		case "/create-stripe-link":
+			log.Printf("Generating Stripe link for: %+v", linkData)
 			paymentLink = GenerateStripeLink(linkData)
+			log.Printf("Stripe link result: %s", paymentLink)
 			responseText = fmt.Sprintf("Stripe Payment Link for *%s*\nAmount: *$%.2f*\nReference: `%s`\nLink: <%s|Click here to pay>",
 				linkData.ServiceName, linkData.Amount, linkData.ReferenceNumber, paymentLink)
 		default:
+			log.Printf("Unknown command received: %s", s.Command)
 			responseText = fmt.Sprintf("Unknown command: %s", s.Command)
 		}
 	}
@@ -199,5 +209,6 @@ func handleSlackCommands(w http.ResponseWriter, r *http.Request) {
 func main() {
 	log.Printf("Starting Slack bot server on :%s", port)
 	http.HandleFunc("/slack/commands", handleSlackCommands)
+	log.Printf("Registered /slack/commands handler. Ready to receive requests.")
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
