@@ -30,19 +30,18 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
      - Bot User OAuth Token
      - Signing Secret
 
-### Stripe Credentials
+### Credentials Setup (used for server)
  - Go to Stripe's [dashboard](https://dashboard.stripe.com) and copy the **Secret Key** from the API section. This key will be used to create payment links.
 
-### Airwallex Credentials
- - 
+ - Go to Airwallex's dashboard and create a **Restricted API key** with permissions to create links. This will be used to generate payment links.
 
-### Total Credentials Needed
+#### Total Credentials Needed
  - **Bot User OAuth Token** from Slack App
  - **Signing Secret** from Slack App
  - **Stripe Secret Key** from Stripe Dashboard
  - **Airwallex Client ID** from Airwallex
  - **Airwallex API Key** from Airwallex
- - **Airwallex Base URL** (default is `https://api-demo.airwallex.com` for testing, change to production URL as needed)
+ - **Airwallex Base URL** (default is `https://api.airwallex.com` for production, change to 'https://api-demo.airwallex.com' for testing)
 
 
 ## For the Server: Bot Deployment & Environment
@@ -95,3 +94,7 @@ You can also run the bot using Docker (recommended for deployment):
   - `/create-airwallex-link 100.50 "Website Design" INV-2023-001`
   - `/create-stripe-link 250.00 "Consulting Service" REF-ABC-XYZ`
 - The bot will respond with a real payment link for the requested provider.
+
+## Notes
+- Ensure your server is publicly accessible for Slack to send requests.
+- This server should be available at YOUR_BASE_URL. This URL would be used in Slack App settings for the slash commands.
