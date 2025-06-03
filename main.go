@@ -71,10 +71,47 @@ type PaymentLinkData struct {
 	ReferenceNumber string
 }
 
+// splitArgsQuoted splits a command string into arguments, treating quoted substrings as single arguments.
+func splitArgsQuoted(input string) []string {
+	var args []string
+	var current strings.Builder
+	inQuotes := false
+	var quoteChar rune
+
+	for _, r := range input {
+		switch {
+		case r == '"' || r == '\'':
+			if inQuotes {
+				if r == quoteChar {
+					inQuotes = false
+					args = append(args, current.String())
+					current.Reset()
+				}
+			} else {
+				inQuotes = true
+				quoteChar = r
+			}
+		case r == ' ' || r == '\t':
+			if inQuotes {
+				current.WriteRune(r)
+			} else if current.Len() > 0 {
+				args = append(args, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteRune(r)
+		}
+	}
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+	return args
+}
+
 // parseCommandArguments parses the text from a Slack slash command.
 // It expects the format: "[amount] [service_name] [reference_number]"
 func parseCommandArguments(text string) (*PaymentLinkData, error) {
-	parts := strings.Fields(text)
+	parts := splitArgsQuoted(text)
 	if len(parts) < 3 {
 		return nil, fmt.Errorf("invalid arguments. Usage: [amount] [service_name] [reference_number]")
 	}
