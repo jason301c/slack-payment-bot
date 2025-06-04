@@ -160,7 +160,9 @@ func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentPr
 			Type: slack.PlainTextType,
 			Text: "Cancel",
 		},
-		CallbackID: fmt.Sprintf("payment_link_modal_%s", provider),
+		CallbackID:    fmt.Sprintf("payment_link_modal_%s", provider),
+		ClearOnClose:  true,
+		NotifyOnClose: false,
 		Blocks: slack.Blocks{
 			BlockSet: []slack.Block{
 				// Amount input
@@ -179,6 +181,7 @@ func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentPr
 							Text: "e.g., 19.99",
 						},
 					},
+					Optional: false,
 				},
 				// Service name input
 				&slack.InputBlock{
@@ -196,12 +199,12 @@ func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentPr
 							Text: "e.g., Web Hosting",
 						},
 					},
+					Optional: false,
 				},
 				// Reference number input
 				&slack.InputBlock{
-					Type:     slack.MBTInput,
-					BlockID:  "reference_block",
-					Optional: true,
+					Type:    slack.MBTInput,
+					BlockID: "reference_block",
 					Label: &slack.TextBlockObject{
 						Type: slack.PlainTextType,
 						Text: "Reference Number",
@@ -214,6 +217,11 @@ func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentPr
 							Text: "e.g., INV-2024-001",
 						},
 					},
+					Optional: true,
+					Hint: &slack.TextBlockObject{
+						Type: slack.PlainTextType,
+						Text: "Leave empty for auto-generated reference",
+					},
 				},
 			},
 		},
@@ -224,9 +232,8 @@ func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentPr
 		subscriptionBlocks := []slack.Block{
 			// Subscription checkbox
 			&slack.InputBlock{
-				Type:     slack.MBTInput,
-				BlockID:  "subscription_block",
-				Optional: true,
+				Type:    slack.MBTInput,
+				BlockID: "subscription_block",
 				Label: &slack.TextBlockObject{
 					Type: slack.PlainTextType,
 					Text: "Subscription Options",
@@ -244,12 +251,12 @@ func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentPr
 						},
 					},
 				},
+				Optional: true,
 			},
 			// Billing interval
 			&slack.InputBlock{
-				Type:     slack.MBTInput,
-				BlockID:  "interval_block",
-				Optional: true,
+				Type:    slack.MBTInput,
+				BlockID: "interval_block",
 				Label: &slack.TextBlockObject{
 					Type: slack.PlainTextType,
 					Text: "Billing Interval",
@@ -266,13 +273,17 @@ func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentPr
 						{Text: &slack.TextBlockObject{Type: slack.PlainTextType, Text: "Weekly"}, Value: "week"},
 						{Text: &slack.TextBlockObject{Type: slack.PlainTextType, Text: "Yearly"}, Value: "year"},
 					},
+					InitialOption: &slack.OptionBlockObject{
+						Text:  &slack.TextBlockObject{Type: slack.PlainTextType, Text: "Monthly"},
+						Value: "month",
+					},
 				},
+				Optional: true,
 			},
 			// Interval count
 			&slack.InputBlock{
-				Type:     slack.MBTInput,
-				BlockID:  "interval_count_block",
-				Optional: true,
+				Type:    slack.MBTInput,
+				BlockID: "interval_count_block",
 				Label: &slack.TextBlockObject{
 					Type: slack.PlainTextType,
 					Text: "Billing Frequency",
@@ -291,12 +302,18 @@ func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentPr
 						{Text: &slack.TextBlockObject{Type: slack.PlainTextType, Text: "Every 6"}, Value: "6"},
 						{Text: &slack.TextBlockObject{Type: slack.PlainTextType, Text: "Every 12"}, Value: "12"},
 					},
+					InitialOption: &slack.OptionBlockObject{
+						Text:  &slack.TextBlockObject{Type: slack.PlainTextType, Text: "Every 1"},
+						Value: "1",
+					},
 				},
+				Optional: true,
 			},
 		}
 		modalView.Blocks.BlockSet = append(modalView.Blocks.BlockSet, subscriptionBlocks...)
 	}
 
+	// Open the modal view
 	_, err := s.client.OpenView(triggerID, modalView)
 	if err != nil {
 		log.Printf("Error opening modal: %v", err)
