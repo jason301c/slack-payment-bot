@@ -12,33 +12,13 @@ func splitArgsQuoted(input string) []string {
 	var current strings.Builder
 	inGroup := false
 	var groupChar rune
-	groupStack := []rune{}
-	escaped := false
 
 	for _, r := range input {
-		if escaped {
-			current.WriteRune(r)
-			escaped = false
-			continue
-		}
-		if r == '\\' {
-			escaped = true
-			continue
-		}
 		if inGroup {
-			if (r == groupChar && len(groupStack) == 1) || (r == groupStack[len(groupStack)-1] && (groupChar == '"' || groupChar == '\'')) {
-				// End of group
-				groupStack = groupStack[:len(groupStack)-1]
-				if len(groupStack) == 0 {
-					inGroup = false
-					args = append(args, current.String())
-					current.Reset()
-				}
-				continue
-			} else if (r == '[' && groupChar == '[') || (r == '"' && groupChar == '"') || (r == '\'' && groupChar == '\'') {
-				// Nested group
-				groupStack = append(groupStack, r)
-				current.WriteRune(r)
+			if r == groupChar || (groupChar == '[' && r == ']') {
+				inGroup = false
+				args = append(args, current.String())
+				current.Reset()
 				continue
 			}
 			current.WriteRune(r)
@@ -46,8 +26,11 @@ func splitArgsQuoted(input string) []string {
 		}
 		if r == '"' || r == '\'' || r == '[' {
 			inGroup = true
-			groupChar = r
-			groupStack = append(groupStack, r)
+			if r == '[' {
+				groupChar = '['
+			} else {
+				groupChar = r
+			}
 			continue
 		}
 		if r == ' ' || r == '\t' {
