@@ -16,7 +16,7 @@ RUN go mod download
 COPY . .
 
 # Build the Go app (static binary)
-RUN CGO_ENABLED=0 GOOS=linux go build -o /slack-payment-bot main.go payment-providers.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o /slack-payment-bot .
 
 # Use a minimal base image for running
 FROM alpine:latest
