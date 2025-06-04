@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/slack-go/slack"
 )
@@ -76,7 +77,39 @@ func HandleSlackCommands(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Open modal for payment link creation
+	// If command text is provided, try to parse it directly
+	if s.Text != "" {
+		data, err := parseCommandArguments(s.Text)
+		if err != nil {
+			log.Printf("Error parsing command arguments: %v", err)
+			respondToSlack(w, fmt.Sprintf("Invalid command format: %v\n\nUsage examples:\n• %s 19.99 \"Web Hosting\" INV-2024-001\n• %s 99.99 \"Consulting\" REF-ABC-123 true month 1", err, s.Command, s.Command))
+			return
+		}
+
+		// Generate payment link
+		var paymentLink string
+		var generationErr error
+
+		switch provider {
+		case ProviderStripe:
+			paymentLink, generationErr = slackService.stripeGenerator.GenerateLink(data)
+		case ProviderAirwallex:
+			paymentLink, generationErr = slackService.airwallexGenerator.GenerateLink(data)
+		}
+
+		if generationErr != nil {
+			log.Printf("Error generating payment link: %v", generationErr)
+			respondToSlack(w, fmt.Sprintf("Error generating payment link: %v", generationErr))
+			return
+		}
+
+		// Send success message
+		slackService.sendPaymentLinkMessage(s.UserID, s.ChannelID, data, paymentLink, provider)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// If no text provided, open modal
 	if err := slackService.openPaymentLinkModal(s.TriggerID, provider); err != nil {
 		log.Printf("Error opening modal: %v", err)
 		respondToSlack(w, "Error opening payment form. Please try again.")
@@ -111,6 +144,8 @@ func HandleSlackInteractions(w http.ResponseWriter, r *http.Request) {
 
 // openPaymentLinkModal opens a modal for payment link creation
 func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentProvider) error {
+	log.Printf("Opening payment link modal for provider: %s", provider)
+
 	modalView := slack.ModalViewRequest{
 		Type: slack.VTModal,
 		Title: &slack.TextBlockObject{
@@ -137,9 +172,12 @@ func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentPr
 						Text: "Amount (USD)",
 					},
 					Element: &slack.PlainTextInputBlockElement{
-						Type:        slack.METPlainTextInput,
-						ActionID:    "amount_input",
-						Placeholder: &slack.TextBlockObject{Type: slack.PlainTextType, Text: "e.g., 19.99"},
+						Type:     slack.METPlainTextInput,
+						ActionID: "amount_input",
+						Placeholder: &slack.TextBlockObject{
+							Type: slack.PlainTextType,
+							Text: "e.g., 19.99",
+						},
 					},
 				},
 				// Service name input
@@ -151,23 +189,30 @@ func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentPr
 						Text: "Service/Product Name",
 					},
 					Element: &slack.PlainTextInputBlockElement{
-						Type:        slack.METPlainTextInput,
-						ActionID:    "service_input",
-						Placeholder: &slack.TextBlockObject{Type: slack.PlainTextType, Text: "e.g., Web Hosting"},
+						Type:     slack.METPlainTextInput,
+						ActionID: "service_input",
+						Placeholder: &slack.TextBlockObject{
+							Type: slack.PlainTextType,
+							Text: "e.g., Web Hosting",
+						},
 					},
 				},
 				// Reference number input
 				&slack.InputBlock{
-					Type:    slack.MBTInput,
-					BlockID: "reference_block",
+					Type:     slack.MBTInput,
+					BlockID:  "reference_block",
+					Optional: true,
 					Label: &slack.TextBlockObject{
 						Type: slack.PlainTextType,
 						Text: "Reference Number",
 					},
 					Element: &slack.PlainTextInputBlockElement{
-						Type:        slack.METPlainTextInput,
-						ActionID:    "reference_input",
-						Placeholder: &slack.TextBlockObject{Type: slack.PlainTextType, Text: "e.g., 2024-INV-001"},
+						Type:     slack.METPlainTextInput,
+						ActionID: "reference_input",
+						Placeholder: &slack.TextBlockObject{
+							Type: slack.PlainTextType,
+							Text: "e.g., INV-2024-001",
+						},
 					},
 				},
 			},
@@ -187,7 +232,7 @@ func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentPr
 					Text: "Subscription Options",
 				},
 				Element: &slack.CheckboxGroupsBlockElement{
-					Type:     "checkboxes",
+					Type:     slack.METCheckboxGroups,
 					ActionID: "subscription_checkbox",
 					Options: []*slack.OptionBlockObject{
 						{
@@ -253,16 +298,23 @@ func (s *SlackService) openPaymentLinkModal(triggerID string, provider PaymentPr
 	}
 
 	_, err := s.client.OpenView(triggerID, modalView)
-	return err
+	if err != nil {
+		log.Printf("Error opening modal: %v", err)
+		return fmt.Errorf("failed to open modal: %w", err)
+	}
+
+	return nil
 }
 
 // handleModalSubmission processes modal form submissions
 func (s *SlackService) handleModalSubmission(w http.ResponseWriter, interaction *slack.InteractionCallback) {
+	log.Printf("Handling modal submission for callback ID: %s", interaction.View.CallbackID)
+
 	// Extract provider from callback ID
 	callbackParts := strings.Split(interaction.View.CallbackID, "_")
 	if len(callbackParts) < 3 {
-		log.Printf("Invalid callback ID: %s", interaction.View.CallbackID)
-		w.WriteHeader(http.StatusBadRequest)
+		log.Printf("Invalid callback ID format: %s", interaction.View.CallbackID)
+		respondWithError(w, "", "Invalid callback ID")
 		return
 	}
 	provider := PaymentProvider(callbackParts[len(callbackParts)-1])
@@ -270,7 +322,7 @@ func (s *SlackService) handleModalSubmission(w http.ResponseWriter, interaction 
 	// Parse form values
 	values := interaction.View.State.Values
 
-	// Extract amount
+	// Extract and validate amount
 	amountStr := values["amount_block"]["amount_input"].Value
 	amount, err := strconv.ParseFloat(amountStr, 64)
 	if err != nil || amount <= 0 {
@@ -278,18 +330,17 @@ func (s *SlackService) handleModalSubmission(w http.ResponseWriter, interaction 
 		return
 	}
 
-	// Extract service name
+	// Extract and validate service name
 	serviceName := values["service_block"]["service_input"].Value
 	if serviceName == "" {
 		respondWithError(w, "service_block", "Service name is required")
 		return
 	}
 
-	// Extract reference number
-	referenceNumber := values["reference_block"]["reference_input"].Value
-	if referenceNumber == "" {
-		respondWithError(w, "reference_block", "Reference number is required")
-		return
+	// Extract reference number (optional)
+	referenceNumber := fmt.Sprintf("REF-%d", time.Now().Unix())
+	if refValue, ok := values["reference_block"]["reference_input"]; ok && refValue.Value != "" {
+		referenceNumber = refValue.Value
 	}
 
 	// Parse subscription options (Stripe only)
@@ -298,20 +349,28 @@ func (s *SlackService) handleModalSubmission(w http.ResponseWriter, interaction 
 	intervalCount := int64(1)
 
 	if provider == ProviderStripe {
-		if subscriptionValue, ok := values["subscription_block"]["subscription_checkbox"]; ok {
-			isSubscription = len(subscriptionValue.SelectedOptions) > 0
-		}
-
-		if intervalValue, ok := values["interval_block"]["interval_select"]; ok {
-			if selectedOption := intervalValue.SelectedOption; selectedOption.Value != "" {
-				interval = selectedOption.Value
+		if subBlock, ok := values["subscription_block"]; ok {
+			if subValue, ok := subBlock["subscription_checkbox"]; ok {
+				isSubscription = len(subValue.SelectedOptions) > 0
 			}
 		}
 
-		if intervalCountValue, ok := values["interval_count_block"]["interval_count_select"]; ok {
-			if selectedOption := intervalCountValue.SelectedOption; selectedOption.Value != "" {
-				if count, err := strconv.ParseInt(selectedOption.Value, 10, 64); err == nil {
-					intervalCount = count
+		if isSubscription {
+			if intervalBlock, ok := values["interval_block"]; ok {
+				if intervalValue, ok := intervalBlock["interval_select"]; ok {
+					if selectedOption := intervalValue.SelectedOption; selectedOption.Value != "" {
+						interval = selectedOption.Value
+					}
+				}
+			}
+
+			if countBlock, ok := values["interval_count_block"]; ok {
+				if countValue, ok := countBlock["interval_count_select"]; ok {
+					if selectedOption := countValue.SelectedOption; selectedOption.Value != "" {
+						if count, err := strconv.ParseInt(selectedOption.Value, 10, 64); err == nil {
+							intervalCount = count
+						}
+					}
 				}
 			}
 		}
@@ -346,11 +405,11 @@ func (s *SlackService) handleModalSubmission(w http.ResponseWriter, interaction 
 		return
 	}
 
-	// Send success message to channel
-	s.sendPaymentLinkMessage(interaction.User.ID, interaction.View.PrivateMetadata, paymentData, paymentLink, provider)
+	// Send success message
+	channelID := interaction.Channel.ID
+	s.sendPaymentLinkMessage(interaction.User.ID, channelID, paymentData, paymentLink, provider)
 
 	// Close modal with success
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
 

@@ -4,92 +4,105 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
-// splitArgsQuoted splits a command string into arguments, treating quoted substrings or bracketed substrings as single arguments.
+// splitArgsQuoted splits a command string into arguments, treating quoted substrings as single arguments.
 func splitArgsQuoted(input string) []string {
 	var args []string
 	var current strings.Builder
-	inGroup := false
-	var groupChar rune
+	inQuotes := false
+	var quoteChar rune
 
 	for _, r := range input {
-		if inGroup {
-			if r == groupChar || (groupChar == '[' && r == ']') {
-				inGroup = false
-				args = append(args, current.String())
-				current.Reset()
-				continue
-			}
-			current.WriteRune(r)
-			continue
-		}
-		if r == '"' || r == '\'' || r == '[' {
-			inGroup = true
-			if r == '[' {
-				groupChar = '['
+		switch {
+		case r == '"' || r == '\'':
+			if !inQuotes {
+				inQuotes = true
+				quoteChar = r
+			} else if r == quoteChar {
+				inQuotes = false
+				if current.Len() > 0 {
+					args = append(args, current.String())
+					current.Reset()
+				}
 			} else {
-				groupChar = r
+				current.WriteRune(r)
 			}
-			continue
-		}
-		if r == ' ' || r == '\t' {
+		case r == ' ' && !inQuotes:
 			if current.Len() > 0 {
 				args = append(args, current.String())
 				current.Reset()
 			}
-			continue
+		default:
+			current.WriteRune(r)
 		}
-		current.WriteRune(r)
 	}
+
 	if current.Len() > 0 {
 		args = append(args, current.String())
 	}
-	// If inGroup is still true, treat as unterminated group, add as is
-	if inGroup && current.Len() > 0 {
-		args = append(args, current.String())
-	}
+
 	return args
 }
 
 // parseCommandArguments parses the text from a Slack slash command.
-// It expects the format: "[amount] [service_name] [reference_number] [subscription] [interval] [interval_count]"
-// It also supports quoted strings and bracketed strings.
+// Format: <amount> "<service_name>" <reference_number>
 func parseCommandArguments(text string) (*PaymentLinkData, error) {
 	parts := splitArgsQuoted(text)
 
-	if len(parts) < 3 {
-		return nil, fmt.Errorf("invalid number of arguments. Usage: [amount] [service_name] [reference_number] [subscription] [interval] [interval_count]")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid format. Usage: <amount> \"<service_name>\" [reference_number]")
 	}
 
-	amountStr := parts[0]
+	// Parse amount
+	amountStr := strings.TrimSpace(parts[0])
 	amount, err := strconv.ParseFloat(amountStr, 64)
 	if err != nil {
-		return nil, fmt.Errorf("invalid amount. Ensure the amount is a positive number (in USD)")
+		return nil, fmt.Errorf("invalid amount '%s'. Please provide a valid number", amountStr)
 	}
 	if amount <= 0 {
-		return nil, fmt.Errorf("amount must be a positive number")
+		return nil, fmt.Errorf("amount must be greater than 0")
 	}
 
-	serviceName := parts[1]
-	referenceNumber := parts[2]
+	// Get service name
+	serviceName := strings.TrimSpace(parts[1])
+	if serviceName == "" {
+		return nil, fmt.Errorf("service name cannot be empty")
+	}
 
+	// Get reference number (optional)
+	referenceNumber := fmt.Sprintf("REF-%d", time.Now().Unix())
+	if len(parts) > 2 {
+		referenceNumber = strings.TrimSpace(parts[2])
+	}
+
+	// Parse subscription options if provided
 	isSubscription := false
-	interval := ""
+	interval := "month"
 	intervalCount := int64(1)
 
 	if len(parts) > 3 {
-		sub := strings.ToLower(parts[3])
-		if sub == "true" || sub == "yes" || sub == "1" {
-			isSubscription = true
+		subStr := strings.ToLower(strings.TrimSpace(parts[3]))
+		isSubscription = subStr == "true" || subStr == "yes" || subStr == "1"
+
+		if isSubscription {
 			if len(parts) > 4 {
-				interval = strings.ToLower(parts[4])
-			}
-			if len(parts) > 5 {
-				ic, err := strconv.ParseInt(parts[5], 10, 64)
-				if err == nil && ic > 0 {
-					intervalCount = ic
+				interval = strings.ToLower(strings.TrimSpace(parts[4]))
+				if !isValidInterval(interval) {
+					return nil, fmt.Errorf("invalid interval '%s'. Must be one of: month, week, year", interval)
 				}
+			}
+
+			if len(parts) > 5 {
+				count, err := strconv.ParseInt(strings.TrimSpace(parts[5]), 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("invalid interval count '%s'. Must be a positive number", parts[5])
+				}
+				if count < 1 {
+					return nil, fmt.Errorf("interval count must be greater than 0")
+				}
+				intervalCount = count
 			}
 		}
 	}
@@ -102,4 +115,14 @@ func parseCommandArguments(text string) (*PaymentLinkData, error) {
 		Interval:        interval,
 		IntervalCount:   intervalCount,
 	}, nil
+}
+
+// isValidInterval checks if the provided interval is valid
+func isValidInterval(interval string) bool {
+	validIntervals := map[string]bool{
+		"month": true,
+		"week":  true,
+		"year":  true,
+	}
+	return validIntervals[interval]
 }
