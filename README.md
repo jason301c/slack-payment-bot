@@ -94,6 +94,24 @@ You can also run the bot using Docker (recommended for deployment):
   - `/create-stripe-link 250.00 "Consulting Service" REF-ABC-XYZ`
 - The bot will respond with a real payment link for the requested provider.
 
+## Stripe Recurring/Subscription Payments
+You can now create recurring (subscription) payment links with Stripe. To do so, use the following format:
+
+```
+/create-stripe-link [amount] [service_name] [reference_number] [subscription] [interval] [interval_count]
+```
+
+- `[subscription]`: Set to `true` to create a recurring payment (otherwise omit or use `false` for one-time)
+- `[interval]`: Billing interval, e.g. `month`, `week`, `year` (default: `month`)
+- `[interval_count]`: How many intervals per billing period, e.g. `1` for every month, `3` for every 3 months (default: `1`)
+
+**Examples:**
+- `/create-stripe-link 19.99 "Web Hosting" 2024-INV-001 true month 1` (monthly subscription)
+- `/create-stripe-link 99.00 "Consulting Retainer" 2024-INV-002 true year 1` (yearly subscription)
+- `/create-stripe-link 50.00 "Quarterly Service" 2024-INV-003 true month 3` (every 3 months)
+
+If you omit the subscription arguments, a one-time payment link will be created as before.
+
 ## Notes
 - Ensure your server is publicly accessible for Slack to send requests.
 - This server should be available at YOUR_BASE_URL. This URL would be used in Slack App settings for the slash commands.

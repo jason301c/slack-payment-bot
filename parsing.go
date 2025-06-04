@@ -53,13 +53,13 @@ func splitArgsQuoted(input string) []string {
 }
 
 // parseCommandArguments parses the text from a Slack slash command.
-// It expects the format: "[amount] [service_name] [reference_number]"
+// It expects the format: "[amount] [service_name] [reference_number] [subscription] [interval] [interval_count]"
 // It also supports quoted strings and bracketed strings.
 func parseCommandArguments(text string) (*PaymentLinkData, error) {
 	parts := splitArgsQuoted(text)
 
 	if len(parts) < 3 {
-		return nil, fmt.Errorf("invalid number of arguments. Usage: [amount] [service_name] [reference_number]")
+		return nil, fmt.Errorf("invalid number of arguments. Usage: [amount] [service_name] [reference_number] [subscription] [interval] [interval_count]")
 	}
 
 	amountStr := parts[0]
@@ -74,9 +74,32 @@ func parseCommandArguments(text string) (*PaymentLinkData, error) {
 	serviceName := parts[1]
 	referenceNumber := parts[2]
 
+	isSubscription := false
+	interval := ""
+	intervalCount := int64(1)
+
+	if len(parts) > 3 {
+		sub := strings.ToLower(parts[3])
+		if sub == "true" || sub == "yes" || sub == "1" {
+			isSubscription = true
+			if len(parts) > 4 {
+				interval = strings.ToLower(parts[4])
+			}
+			if len(parts) > 5 {
+				ic, err := strconv.ParseInt(parts[5], 10, 64)
+				if err == nil && ic > 0 {
+					intervalCount = ic
+				}
+			}
+		}
+	}
+
 	return &PaymentLinkData{
 		Amount:          amount,
 		ServiceName:     serviceName,
 		ReferenceNumber: referenceNumber,
+		IsSubscription:  isSubscription,
+		Interval:        interval,
+		IntervalCount:   intervalCount,
 	}, nil
 }
