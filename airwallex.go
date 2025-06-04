@@ -8,11 +8,6 @@ import (
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/stripe/stripe-go/v82"
-	"github.com/stripe/stripe-go/v82/paymentlink"
-	"github.com/stripe/stripe-go/v82/price"
-	"github.com/stripe/stripe-go/v82/product"
 )
 
 // GenerateAirwallexLink creates a real Airwallex payment link using their API.
@@ -109,45 +104,4 @@ func createAirwallexPaymentLink(token string, data *PaymentLinkData) (string, er
 	}
 	log.Printf("[Airwallex] Received payment link: %s", result.PaymentLinkUrl)
 	return result.PaymentLinkUrl, nil
-}
-
-// GenerateStripeLink creates a real Stripe payment link using the Stripe Go SDK.
-func GenerateStripeLink(data *PaymentLinkData) string {
-	stripe.Key = stripeApiKey
-	productParams := &stripe.ProductParams{
-		Name:        stripe.String(data.ServiceName),
-		Description: stripe.String(data.ReferenceNumber),
-	}
-	product, err := product.New(productParams)
-	if err != nil {
-		log.Printf("Stripe product error: %v", err)
-		return "[Stripe product error]"
-	}
-	priceParams := &stripe.PriceParams{
-		Currency:   stripe.String("usd"),
-		UnitAmount: stripe.Int64(int64(data.Amount * 100)),
-		Product:    stripe.String(product.ID),
-	}
-	price, err := price.New(priceParams)
-	if err != nil {
-		log.Printf("Stripe price error: %v", err)
-		return "[Stripe price error]"
-	}
-	params := &stripe.PaymentLinkParams{
-		LineItems: []*stripe.PaymentLinkLineItemParams{
-			{
-				Price:    stripe.String(price.ID),
-				Quantity: stripe.Int64(1),
-			},
-		},
-		PaymentIntentData: &stripe.PaymentLinkPaymentIntentDataParams{
-			SetupFutureUsage: stripe.String("off_session"),
-		},
-	}
-	link, err := paymentlink.New(params)
-	if err != nil {
-		log.Printf("Stripe link error: %v", err)
-		return "[Stripe link error]"
-	}
-	return link.URL
 }
