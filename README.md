@@ -2,7 +2,6 @@
 
 This Slack bot allows you to generate real Airwallex and Stripe payment links directly from your Slack workspace using slash commands.
 
-
 ## Client Setup
 
 ### Slack App Setup
@@ -17,6 +16,7 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
    - Create two commands:
      - `/create-airwallex-link` (Request URL: `https://YOUR_PUBLIC_URL/slack/commands`)
      - `/create-stripe-link` (Request URL: `https://YOUR_PUBLIC_URL/slack/commands`)
+   - `YOUR_PUBLIC_URL` should be the URL where your bot server is hosted.
    - Usage hint: `[amount] [service_name] [reference_number]`
 
 3. **Install the App to Your Workspace**
@@ -42,8 +42,6 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
  - **Stripe Secret Key** from Stripe Dashboard
  - **Airwallex Client ID** from Airwallex
  - **Airwallex API Key** from Airwallex
- - **Airwallex Base URL** (default is `https://api.airwallex.com` for production, change to 'https://api-demo.airwallex.com' for testing)
-
 
 ## For the Server: Bot Deployment & Environment
 
@@ -55,11 +53,11 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
      ```
      SLACK_BOT_TOKEN='xoxb-YOUR-BOT-TOKEN'
      SLACK_SIGNING_SECRET='YOUR-SIGNING-SECRET'
-     PORT='8080'
      STRIPE_API_KEY='sk_test_YOUR_STRIPE_SECRET_KEY'
      AIRWALLEX_CLIENT_ID='YOUR_AIRWALLEX_CLIENT_ID'
      AIRWALLEX_API_KEY='YOUR_AIRWALLEX_API_KEY'
-     AIRWALLEX_BASE_URL='https://api-demo.airwallex.com' # or your production endpoint
+     PORT='8080' # Optional, defaults to this
+     AIRWALLEX_BASE_URL='https://api.airwallex.com' # Optional, defaults to this
      ```
 
 3. **Install Go and Dependencies, then run**
