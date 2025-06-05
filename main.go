@@ -1,214 +1,37 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"os"
-	"strconv"
-	"strings"
 
-	"github.com/slack-go/slack"
+	"paymentbot/config"
+	"paymentbot/handlers"
+	"paymentbot/payment"
+	"paymentbot/services"
 )
-
-// Global Slack API client
-var api *slack.Client
-
-// Environment variables
-var (
-	slackBotToken      string
-	slackSigningSecret string
-	port               string
-	stripeApiKey       string
-	airwallexClientId  string
-	airwallexApiKey    string
-	airwallexBaseUrl   string
-)
-
-func init() {
-	// Initialize environment variables
-	slackBotToken = os.Getenv("SLACK_BOT_TOKEN")
-	slackSigningSecret = os.Getenv("SLACK_SIGNING_SECRET")
-	port = os.Getenv("PORT")
-	stripeApiKey = os.Getenv("STRIPE_API_KEY")
-	airwallexClientId = os.Getenv("AIRWALLEX_CLIENT_ID")
-	airwallexApiKey = os.Getenv("AIRWALLEX_API_KEY")
-	airwallexBaseUrl = os.Getenv("AIRWALLEX_BASE_URL")
-
-	if slackBotToken == "" {
-		log.Fatal("SLACK_BOT_TOKEN environment variable not set.")
-	}
-	if slackSigningSecret == "" {
-		log.Fatal("SLACK_SIGNING_SECRET environment variable not set.")
-	}
-	if port == "" {
-		port = "8080" // Default port
-		log.Printf("PORT environment variable not set, defaulting to %s", port)
-	}
-	if stripeApiKey == "" {
-		log.Fatal("STRIPE_API_KEY environment variable not set.")
-	}
-	if airwallexClientId == "" {
-		log.Fatal("AIRWALLEX_CLIENT_ID environment variable not set.")
-	}
-	if airwallexApiKey == "" {
-		log.Fatal("AIRWALLEX_API_KEY environment variable not set.")
-	}
-	if airwallexBaseUrl == "" {
-		airwallexBaseUrl = "https://api.airwallex.com" // Default to prod url
-	}
-
-	// Initialize the Slack API client
-	api = slack.New(slackBotToken)
-}
-
-// PaymentLinkData holds the parsed data for creating a payment link.
-type PaymentLinkData struct {
-	Amount          float64
-	ServiceName     string
-	ReferenceNumber string
-}
-
-// splitArgsQuoted splits a command string into arguments, treating quoted substrings as single arguments.
-func splitArgsQuoted(input string) []string {
-	var args []string
-	var current strings.Builder
-	inQuotes := false
-	var quoteChar rune
-
-	for _, r := range input {
-		switch {
-		case r == '"' || r == '\'':
-			if inQuotes {
-				if r == quoteChar {
-					inQuotes = false
-					args = append(args, current.String())
-					current.Reset()
-				}
-			} else {
-				inQuotes = true
-				quoteChar = r
-			}
-		case r == ' ' || r == '\t':
-			if inQuotes {
-				current.WriteRune(r)
-			} else if current.Len() > 0 {
-				args = append(args, current.String())
-				current.Reset()
-			}
-		default:
-			current.WriteRune(r)
-		}
-	}
-	if current.Len() > 0 {
-		args = append(args, current.String())
-	}
-	return args
-}
-
-// parseCommandArguments parses the text from a Slack slash command.
-// It expects the format: "[amount] [service_name] [reference_number]"
-func parseCommandArguments(text string) (*PaymentLinkData, error) {
-	parts := splitArgsQuoted(text)
-	if len(parts) < 3 {
-		return nil, fmt.Errorf("invalid arguments. Usage: [amount] [service_name] [reference_number]")
-	}
-
-	amountStr := parts[0]
-	amount, err := strconv.ParseFloat(amountStr, 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid amount: %v", err)
-	}
-	if amount <= 0 {
-		return nil, fmt.Errorf("amount must be a positive number")
-	}
-
-	serviceName := parts[1]
-	referenceNumber := parts[2]
-
-	return &PaymentLinkData{
-		Amount:          amount,
-		ServiceName:     serviceName,
-		ReferenceNumber: referenceNumber,
-	}, nil
-}
-
-// handleSlackCommands processes incoming Slack slash command requests.
-func handleSlackCommands(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Received Slack command request: method=%s, url=%s, remote=%s", r.Method, r.URL.String(), r.RemoteAddr)
-	verifier, err := slack.NewSecretsVerifier(r.Header, slackSigningSecret)
-	if err != nil {
-		log.Printf("Error creating verifier: %v", err)
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
-
-	r.Body = io.NopCloser(io.TeeReader(r.Body, &verifier))
-	s, err := slack.SlashCommandParse(r)
-	if err != nil {
-		log.Printf("Error parsing slash command: %v", err)
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
-
-	log.Printf("Parsed Slack command: command=%s, text=%s, user_id=%s, channel_id=%s", s.Command, s.Text, s.UserID, s.ChannelID)
-
-	if err = verifier.Ensure(); err != nil {
-		log.Printf("Error verifying request: %v", err)
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	var responseText string
-	var paymentLink string
-
-	// Parse the command arguments
-	linkData, err := parseCommandArguments(s.Text)
-	if err != nil {
-		log.Printf("Argument parsing error for command '%s': %v (text: %s)", s.Command, err, s.Text)
-		responseText = fmt.Sprintf("Error: %s\nUsage: `/%s [amount] [service_name] [reference_number]`", err.Error(), s.Command[1:])
-	} else {
-		log.Printf("Parsed arguments: amount=%.2f, service_name=%s, reference_number=%s", linkData.Amount, linkData.ServiceName, linkData.ReferenceNumber)
-		switch s.Command {
-		case "/create-airwallex-link":
-			log.Printf("Generating Airwallex link for: %+v", linkData)
-			paymentLink = GenerateAirwallexLink(linkData)
-			log.Printf("Airwallex link result: %s", paymentLink)
-			responseText = fmt.Sprintf("Airwallex Payment Link for *%s*\nAmount: *$%.2f*\nReference: `%s`\nLink: <%s|Click here to pay>",
-				linkData.ServiceName, linkData.Amount, linkData.ReferenceNumber, paymentLink)
-		case "/create-stripe-link":
-			log.Printf("Generating Stripe link for: %+v", linkData)
-			paymentLink = GenerateStripeLink(linkData)
-			log.Printf("Stripe link result: %s", paymentLink)
-			responseText = fmt.Sprintf("Stripe Payment Link for *%s*\nAmount: *$%.2f*\nReference: `%s`\nLink: <%s|Click here to pay>",
-				linkData.ServiceName, linkData.Amount, linkData.ReferenceNumber, paymentLink)
-		default:
-			log.Printf("Unknown command received: %s", s.Command)
-			responseText = fmt.Sprintf("Unknown command: %s", s.Command)
-		}
-	}
-
-	// Send an immediate response to Slack
-	w.Header().Set("Content-Type", "application/json")
-	type slackResponse struct {
-		Text         string `json:"text"`
-		ResponseType string `json:"response_type"`
-	}
-	resp := slackResponse{
-		Text:         responseText,
-		ResponseType: "in_channel", // or "ephemeral"
-	}
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		log.Printf("Error encoding response: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
-}
 
 func main() {
-	log.Printf("Starting Slack bot server on :%s", port)
-	http.HandleFunc("/slack/commands", handleSlackCommands)
-	log.Printf("Registered /slack/commands handler. Ready to receive requests.")
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	appConfig := config.LoadConfig()
+	log.Printf("Starting Slack bot server on :%s", appConfig.Port)
+
+	// Initialize Payment Generators
+	stripeGenerator := payment.NewStripeGenerator(appConfig.StripeAPIKey)
+	airwallexGenerator := payment.NewAirwallexGenerator(
+		appConfig.AirwallexClientID,
+		appConfig.AirwallexAPIKey,
+		appConfig.AirwallexBaseURL,
+	)
+
+	// Initialize Slack Service
+	slackService := services.NewSlackService(appConfig, stripeGenerator, airwallexGenerator)
+
+	// Initialize Slack Handler
+	slackHandler := handlers.NewSlackHandler(slackService)
+
+	// Register handlers
+	http.HandleFunc("/slack/commands", slackHandler.HandleSlackCommands)
+	http.HandleFunc("/slack/interactions", slackHandler.HandleSlackInteractions)
+
+	log.Printf("Registered handlers. Ready to receive requests.")
+	log.Fatal(http.ListenAndServe(":"+appConfig.Port, nil))
 }

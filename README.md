@@ -1,7 +1,6 @@
 # Slack Payment Link Bot
 
-This Slack bot allows you to generate real Airwallex and Stripe payment links directly from your Slack workspace using slash commands.
-
+This Slack bot allows you to generate real Airwallex and Stripe payment links directly from your Slack workspace using slash commands and interactive modals.
 
 ## Client Setup
 
@@ -17,15 +16,20 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
    - Create two commands:
      - `/create-airwallex-link` (Request URL: `https://YOUR_PUBLIC_URL/slack/commands`)
      - `/create-stripe-link` (Request URL: `https://YOUR_PUBLIC_URL/slack/commands`)
-   - Usage hint: `[amount] [service_name] [reference_number]`
+   - `YOUR_PUBLIC_URL` should be the URL where your bot server is hosted.
+   - **Note:** You no longer provide arguments directly in the slash command. The bot will always open a modal for you to fill in the payment details.
 
-3. **Install the App to Your Workspace**
+3. **Configure Interactivity & Shortcuts**
+   - In your app settings, go to **Features > Interactivity & Shortcuts**.
+   - Enable interactivity and set the Request URL to `https://YOUR_PUBLIC_URL/slack/interactions`.
+
+4. **Install the App to Your Workspace**
    - Go to **Settings > Install App**.
    - Click "Install to YOUR COMPANY" and grant permissions.
    - Copy your **Bot User OAuth Token** and **Signing Secret** (you'll need to provide these to the server/bot operator).
    - (Note that the signing secret is from **Settings > Basic Information**).
 
-4. **Share Credentials**
+5. **Share Credentials**
    - Provide the following to the person running the bot:
      - Bot User OAuth Token
      - Signing Secret
@@ -42,8 +46,6 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
  - **Stripe Secret Key** from Stripe Dashboard
  - **Airwallex Client ID** from Airwallex
  - **Airwallex API Key** from Airwallex
- - **Airwallex Base URL** (default is `https://api.airwallex.com` for production, change to 'https://api-demo.airwallex.com' for testing)
-
 
 ## For the Server: Bot Deployment & Environment
 
@@ -55,11 +57,11 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
      ```
      SLACK_BOT_TOKEN='xoxb-YOUR-BOT-TOKEN'
      SLACK_SIGNING_SECRET='YOUR-SIGNING-SECRET'
-     PORT='8080'
      STRIPE_API_KEY='sk_test_YOUR_STRIPE_SECRET_KEY'
      AIRWALLEX_CLIENT_ID='YOUR_AIRWALLEX_CLIENT_ID'
      AIRWALLEX_API_KEY='YOUR_AIRWALLEX_API_KEY'
-     AIRWALLEX_BASE_URL='https://api-demo.airwallex.com' # or your production endpoint
+     PORT='8080' # Optional, defaults to this
+     AIRWALLEX_BASE_URL='https://api.airwallex.com' # Optional, defaults to this
      ```
 
 3. **Install Go and Dependencies, then run**
@@ -92,10 +94,19 @@ You can also run the bot using Docker (recommended for deployment):
 
 ## Usage
 - In your Slack workspace, use the slash commands:
-  - `/create-airwallex-link 100.50 "Website Design" INV-2023-001`
-  - `/create-stripe-link 250.00 "Consulting Service" REF-ABC-XYZ`
-- The bot will respond with a real payment link for the requested provider.
+  - `/create-airwallex-link`
+  - `/create-stripe-link`
+- The bot will open a modal for you to fill in the payment details (amount, service name, reference, and for Stripe, subscription options).
+- After submitting the modal, the bot will respond with a real payment link for the requested provider.
+
+## Stripe Recurring/Subscription Payments
+You can create recurring (subscription) payment links with Stripe by selecting the subscription options in the modal. The modal will allow you to choose the billing interval and frequency.
 
 ## Notes
 - Ensure your server is publicly accessible for Slack to send requests.
-- This server should be available at YOUR_BASE_URL. This URL would be used in Slack App settings for the slash commands.
+- This server should be available at YOUR_BASE_URL. This URL would be used in Slack App settings for the slash commands and interactivity.
+- **Direct argument parsing in slash commands is no longer supported.** All input is via the modal.
+
+---
+
+For any other issues, check your server logs and Slack app logs for more details.
