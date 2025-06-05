@@ -36,9 +36,9 @@ func (s *SlackService) GetSigningSecret() string {
 	return s.signingSecret
 }
 
-func (s *SlackService) OpenPaymentLinkModal(triggerID string, provider models.PaymentProvider) error {
-	log.Printf("Opening payment link modal for provider: %s", provider)
-	modalView := BuildPaymentModalView(provider)
+func (s *SlackService) OpenPaymentLinkModal(triggerID string, provider models.PaymentProvider, channelID string) error {
+	log.Printf("Opening payment link modal for provider: %s, channel: %s", provider, channelID)
+	modalView := BuildPaymentModalView(provider, channelID)
 
 	// Debug: log the modal JSON
 	if debugJSON, err := json.MarshalIndent(modalView, "", "  "); err == nil {
@@ -78,7 +78,13 @@ func (s *SlackService) SendPaymentLinkMessage(userID, channelID string, data *mo
 	}
 	_, _, err := s.client.PostMessage(channelID, slack.MsgOptionText(msg, false))
 	if err != nil {
-		log.Printf("Error sending payment link message: %v", err)
+		log.Printf("Error sending payment link message to channel %s: %v", channelID, err)
+		// Fallback: send to user's DM with debug note
+		debugMsg := msg + fmt.Sprintf("\n\n:warning: _This message was not sent to the channel because of: %v. Perhaps add the bot to the channel?_", err)
+		_, _, dmErr := s.client.PostMessage(userID, slack.MsgOptionText(debugMsg, false))
+		if dmErr != nil {
+			log.Printf("Error sending fallback DM to user %s: %v", userID, dmErr)
+		}
 	}
 }
 
@@ -134,13 +140,19 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 		}
 	}
 
+	internalReference := ""
+	if provider == models.ProviderAirwallex {
+		internalReference = values["internal_reference_block"]["internal_reference_input"].Value
+	}
+
 	paymentData := &models.PaymentLinkData{
-		Amount:          amount,
-		ServiceName:     serviceName,
-		ReferenceNumber: referenceNumber,
-		IsSubscription:  isSubscription,
-		Interval:        interval,
-		IntervalCount:   intervalCount,
+		Amount:            amount,
+		ServiceName:       serviceName,
+		ReferenceNumber:   referenceNumber,
+		IsSubscription:    isSubscription,
+		Interval:          interval,
+		IntervalCount:     intervalCount,
+		InternalReference: internalReference,
 	}
 
 	paymentLink, paymentID, generationErr := s.GenerateLinkForProvider(paymentData, provider)
@@ -152,8 +164,13 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 
 	channelID := interaction.Channel.ID
 	if channelID == "" {
-		// Fallback to DM the user if no channel context is available
-		channelID = interaction.User.ID
+		// Try to get channel from private metadata
+		if interaction.View.PrivateMetadata != "" {
+			channelID = interaction.View.PrivateMetadata
+		} else {
+			// Fallback to DM the user if no channel context is available
+			channelID = interaction.User.ID
+		}
 	}
 
 	log.Printf("Sending payment link message to user: %s, channel: %s, payment link: %s, payment ID: %s, provider: %s", interaction.User.ID, channelID, paymentLink, paymentID, provider)

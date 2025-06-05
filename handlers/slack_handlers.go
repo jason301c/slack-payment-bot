@@ -58,7 +58,7 @@ func (sh *SlackHandler) HandleSlackCommands(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Always open the modal, do not parse direct arguments
-	if err := sh.service.OpenPaymentLinkModal(sCmd.TriggerID, provider); err != nil {
+	if err := sh.service.OpenPaymentLinkModal(sCmd.TriggerID, provider, sCmd.ChannelID); err != nil {
 		log.Printf("Error opening modal: %v", err)
 		respondToSlack(w, "Error opening payment form. Please try again.")
 		return

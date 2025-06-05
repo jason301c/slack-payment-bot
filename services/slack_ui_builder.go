@@ -13,7 +13,7 @@ func newPlainTextBlock(text string) *slack.TextBlockObject {
 	return slack.NewTextBlockObject(slack.PlainTextType, text, false, false)
 }
 
-func BuildPaymentModalView(provider models.PaymentProvider) slack.ModalViewRequest {
+func BuildPaymentModalView(provider models.PaymentProvider, privateMetadata string) slack.ModalViewRequest {
 	modalTitle := newPlainTextBlock(fmt.Sprintf("%s Payment", strings.Title(string(provider))))
 	submitText := newPlainTextBlock("Create Link")
 	closeText := newPlainTextBlock("Cancel")
@@ -74,14 +74,25 @@ func BuildPaymentModalView(provider models.PaymentProvider) slack.ModalViewReque
 		allBlocks = append(allBlocks, subscriptionBlock, intervalBlock, countBlock)
 	}
 
+	if provider == models.ProviderAirwallex {
+		internalRefLabel := newPlainTextBlock("Internal reference")
+		internalRefPlaceholder := newPlainTextBlock("e.g. REF-123")
+		internalRefHint := newPlainTextBlock("This reference is only visible to your account. It provides information about this transaction for your records.")
+		internalRefElement := slack.NewPlainTextInputBlockElement(internalRefPlaceholder, "internal_reference_input")
+		internalRefBlock := slack.NewInputBlock("internal_reference_block", internalRefLabel, internalRefHint, internalRefElement)
+		internalRefBlock.Optional = true
+		allBlocks = append(allBlocks, internalRefBlock)
+	}
+
 	return slack.ModalViewRequest{
-		Type:          slack.VTModal,
-		Title:         modalTitle,
-		Submit:        submitText,
-		Close:         closeText,
-		CallbackID:    fmt.Sprintf("payment_link_modal_%s", provider),
-		ClearOnClose:  true,
-		NotifyOnClose: false,
-		Blocks:        slack.Blocks{BlockSet: allBlocks},
+		Type:            slack.VTModal,
+		Title:           modalTitle,
+		Submit:          submitText,
+		Close:           closeText,
+		CallbackID:      fmt.Sprintf("payment_link_modal_%s", provider),
+		ClearOnClose:    true,
+		NotifyOnClose:   false,
+		Blocks:          slack.Blocks{BlockSet: allBlocks},
+		PrivateMetadata: privateMetadata,
 	}
 }

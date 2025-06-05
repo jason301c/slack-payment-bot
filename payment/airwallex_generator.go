@@ -161,8 +161,11 @@ func (a *AirwallexGenerator) buildPaymentLinkRequest(data *models.PaymentLinkDat
 		"currency":    "USD",
 		"title":       data.ServiceName,
 		"description": data.ReferenceNumber,
-		"reference":   fmt.Sprintf("slackbot-%d", time.Now().UnixNano()),
+		"reference":   data.InternalReference,
 		"reusable":    false,
+	}
+	if data.InternalReference == "" {
+		requestBody["reference"] = fmt.Sprintf("slackbot-%d", time.Now().UnixNano())
 	}
 
 	// Note: Airwallex may not support recurring payments in the same way as Stripe

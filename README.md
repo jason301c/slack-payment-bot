@@ -19,17 +19,27 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
    - `YOUR_PUBLIC_URL` should be the URL where your bot server is hosted.
    - **Note:** You no longer provide arguments directly in the slash command. The bot will always open a modal for you to fill in the payment details.
 
-3. **Configure Interactivity & Shortcuts**
+3. **Set Required Bot Token Scopes**
+   - In your app settings, go to **OAuth & Permissions**.
+   - Under **Bot Token Scopes**, add:
+     - `chat:write` (required, to post messages as the bot)
+     - `commands` (required, to handle slash commands)
+     - `chat:write.public` (optional, to post in public channels the bot isn't a member of)
+     - `im:write` (optional, to send DMs to users)
+     - `groups:write` (optional, to post in private channels)
+   - After adding scopes, click **Save Changes**.
+
+4. **Configure Interactivity & Shortcuts**
    - In your app settings, go to **Features > Interactivity & Shortcuts**.
    - Enable interactivity and set the Request URL to `https://YOUR_PUBLIC_URL/slack/interactions`.
 
-4. **Install the App to Your Workspace**
+5. **Install the App to Your Workspace**
    - Go to **Settings > Install App**.
    - Click "Install to YOUR COMPANY" and grant permissions.
    - Copy your **Bot User OAuth Token** and **Signing Secret** (you'll need to provide these to the server/bot operator).
    - (Note that the signing secret is from **Settings > Basic Information**).
 
-5. **Share Credentials**
+6. **Share Credentials**
    - Provide the following to the person running the bot:
      - Bot User OAuth Token
      - Signing Secret
