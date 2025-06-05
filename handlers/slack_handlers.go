@@ -9,7 +9,6 @@ import (
 
 	"paymentbot/models"
 	"paymentbot/services"
-	"paymentbot/utils"
 
 	"github.com/slack-go/slack"
 )
@@ -58,24 +57,7 @@ func (sh *SlackHandler) HandleSlackCommands(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if sCmd.Text != "" {
-		data, err := utils.ParseCommandArguments(sCmd.Text)
-		if err != nil {
-			log.Printf("Error parsing command arguments: %v", err)
-			respondToSlack(w, fmt.Sprintf("Invalid command format: %v\n\nUsage examples:\n• %s 19.99 \"Web Hosting\" INV-2024-001\n• %s 99.99 \"Consulting\" REF-ABC-123 true month 1", err, sCmd.Command, sCmd.Command))
-			return
-		}
-		paymentLink, genErr := sh.service.GenerateLinkForProvider(data, provider)
-		if genErr != nil {
-			log.Printf("Error generating payment link: %v", genErr)
-			respondToSlack(w, fmt.Sprintf("Error generating payment link: %v", genErr))
-			return
-		}
-		sh.service.SendPaymentLinkMessage(sCmd.UserID, sCmd.ChannelID, data, paymentLink, provider)
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
+	// Always open the modal, do not parse direct arguments
 	if err := sh.service.OpenPaymentLinkModal(sCmd.TriggerID, provider); err != nil {
 		log.Printf("Error opening modal: %v", err)
 		respondToSlack(w, "Error opening payment form. Please try again.")

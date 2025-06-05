@@ -39,6 +39,12 @@ func (s *SlackService) GetSigningSecret() string {
 func (s *SlackService) OpenPaymentLinkModal(triggerID string, provider models.PaymentProvider) error {
 	log.Printf("Opening payment link modal for provider: %s", provider)
 	modalView := BuildPaymentModalView(provider)
+
+	// Debug: log the modal JSON
+	if debugJSON, err := json.MarshalIndent(modalView, "", "  "); err == nil {
+		log.Printf("Modal JSON: %s", debugJSON)
+	}
+
 	_, err := s.client.OpenView(triggerID, modalView)
 	if err != nil {
 		log.Printf("Error opening modal: %v", err)
