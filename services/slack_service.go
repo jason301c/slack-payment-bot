@@ -134,13 +134,19 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 		}
 	}
 
+	internalReference := ""
+	if provider == models.ProviderAirwallex {
+		internalReference = values["internal_reference_block"]["internal_reference_input"].Value
+	}
+
 	paymentData := &models.PaymentLinkData{
-		Amount:          amount,
-		ServiceName:     serviceName,
-		ReferenceNumber: referenceNumber,
-		IsSubscription:  isSubscription,
-		Interval:        interval,
-		IntervalCount:   intervalCount,
+		Amount:            amount,
+		ServiceName:       serviceName,
+		ReferenceNumber:   referenceNumber,
+		IsSubscription:    isSubscription,
+		Interval:          interval,
+		IntervalCount:     intervalCount,
+		InternalReference: internalReference,
 	}
 
 	paymentLink, paymentID, generationErr := s.GenerateLinkForProvider(paymentData, provider)

@@ -74,6 +74,16 @@ func BuildPaymentModalView(provider models.PaymentProvider) slack.ModalViewReque
 		allBlocks = append(allBlocks, subscriptionBlock, intervalBlock, countBlock)
 	}
 
+	if provider == models.ProviderAirwallex {
+		internalRefLabel := newPlainTextBlock("Internal reference")
+		internalRefPlaceholder := newPlainTextBlock("e.g. REF-123")
+		internalRefHint := newPlainTextBlock("This reference is only visible to your account. It provides information about this transaction for your records.")
+		internalRefElement := slack.NewPlainTextInputBlockElement(internalRefPlaceholder, "internal_reference_input")
+		internalRefBlock := slack.NewInputBlock("internal_reference_block", internalRefLabel, internalRefHint, internalRefElement)
+		internalRefBlock.Optional = true
+		allBlocks = append(allBlocks, internalRefBlock)
+	}
+
 	return slack.ModalViewRequest{
 		Type:          slack.VTModal,
 		Title:         modalTitle,
