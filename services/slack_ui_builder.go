@@ -31,8 +31,8 @@ func BuildPaymentModalView(provider models.PaymentProvider) slack.ModalViewReque
 	serviceBlock.Optional = false
 
 	referenceLabel := newPlainTextBlock("Description")
-	referencePlaceholder := newPlainTextBlock("")
-	referenceHint := newPlainTextBlock("Appears at checkout, on the customer portal, and in quotes.")
+	referencePlaceholder := newPlainTextBlock("Enter your description here")
+	referenceHint := newPlainTextBlock("Appears at checkout.")
 	referenceElement := slack.NewPlainTextInputBlockElement(referencePlaceholder, "reference_input")
 	referenceBlock := slack.NewInputBlock("reference_block", referenceLabel, referenceHint, referenceElement)
 	referenceBlock.Optional = true
