@@ -13,7 +13,7 @@ func newPlainTextBlock(text string) *slack.TextBlockObject {
 	return slack.NewTextBlockObject(slack.PlainTextType, text, false, false)
 }
 
-func BuildPaymentModalView(provider models.PaymentProvider) slack.ModalViewRequest {
+func BuildPaymentModalView(provider models.PaymentProvider, privateMetadata string) slack.ModalViewRequest {
 	modalTitle := newPlainTextBlock(fmt.Sprintf("%s Payment", strings.Title(string(provider))))
 	submitText := newPlainTextBlock("Create Link")
 	closeText := newPlainTextBlock("Cancel")
@@ -85,13 +85,14 @@ func BuildPaymentModalView(provider models.PaymentProvider) slack.ModalViewReque
 	}
 
 	return slack.ModalViewRequest{
-		Type:          slack.VTModal,
-		Title:         modalTitle,
-		Submit:        submitText,
-		Close:         closeText,
-		CallbackID:    fmt.Sprintf("payment_link_modal_%s", provider),
-		ClearOnClose:  true,
-		NotifyOnClose: false,
-		Blocks:        slack.Blocks{BlockSet: allBlocks},
+		Type:            slack.VTModal,
+		Title:           modalTitle,
+		Submit:          submitText,
+		Close:           closeText,
+		CallbackID:      fmt.Sprintf("payment_link_modal_%s", provider),
+		ClearOnClose:    true,
+		NotifyOnClose:   false,
+		Blocks:          slack.Blocks{BlockSet: allBlocks},
+		PrivateMetadata: privateMetadata,
 	}
 }

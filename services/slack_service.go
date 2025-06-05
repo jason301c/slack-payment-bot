@@ -36,9 +36,9 @@ func (s *SlackService) GetSigningSecret() string {
 	return s.signingSecret
 }
 
-func (s *SlackService) OpenPaymentLinkModal(triggerID string, provider models.PaymentProvider) error {
-	log.Printf("Opening payment link modal for provider: %s", provider)
-	modalView := BuildPaymentModalView(provider)
+func (s *SlackService) OpenPaymentLinkModal(triggerID string, provider models.PaymentProvider, channelID string) error {
+	log.Printf("Opening payment link modal for provider: %s, channel: %s", provider, channelID)
+	modalView := BuildPaymentModalView(provider, channelID)
 
 	// Debug: log the modal JSON
 	if debugJSON, err := json.MarshalIndent(modalView, "", "  "); err == nil {
@@ -158,8 +158,13 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 
 	channelID := interaction.Channel.ID
 	if channelID == "" {
-		// Fallback to DM the user if no channel context is available
-		channelID = interaction.User.ID
+		// Try to get channel from private metadata
+		if interaction.View.PrivateMetadata != "" {
+			channelID = interaction.View.PrivateMetadata
+		} else {
+			// Fallback to DM the user if no channel context is available
+			channelID = interaction.User.ID
+		}
 	}
 
 	log.Printf("Sending payment link message to user: %s, channel: %s, payment link: %s, payment ID: %s, provider: %s", interaction.User.ID, channelID, paymentLink, paymentID, provider)
