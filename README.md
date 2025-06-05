@@ -1,6 +1,6 @@
 # Slack Payment Link Bot
 
-This Slack bot allows you to generate real Airwallex and Stripe payment links directly from your Slack workspace using slash commands.
+This Slack bot allows you to generate real Airwallex and Stripe payment links directly from your Slack workspace using slash commands and interactive modals.
 
 ## Client Setup
 
@@ -17,7 +17,7 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
      - `/create-airwallex-link` (Request URL: `https://YOUR_PUBLIC_URL/slack/commands`)
      - `/create-stripe-link` (Request URL: `https://YOUR_PUBLIC_URL/slack/commands`)
    - `YOUR_PUBLIC_URL` should be the URL where your bot server is hosted.
-   - Usage hint: `[amount] [service_name] [reference_number]`
+   - **Note:** You no longer provide arguments directly in the slash command. The bot will always open a modal for you to fill in the payment details.
 
 3. **Install the App to Your Workspace**
    - Go to **Settings > Install App**.
@@ -90,28 +90,50 @@ You can also run the bot using Docker (recommended for deployment):
 
 ## Usage
 - In your Slack workspace, use the slash commands:
-  - `/create-airwallex-link 100.50 "Website Design" INV-2023-001`
-  - `/create-stripe-link 250.00 "Consulting Service" REF-ABC-XYZ`
-- The bot will respond with a real payment link for the requested provider.
+  - `/create-airwallex-link`
+  - `/create-stripe-link`
+- The bot will open a modal for you to fill in the payment details (amount, service name, reference, and for Stripe, subscription options).
+- After submitting the modal, the bot will respond with a real payment link for the requested provider.
 
 ## Stripe Recurring/Subscription Payments
-You can now create recurring (subscription) payment links with Stripe. To do so, use the following format:
-
-```
-/create-stripe-link [amount] [service_name] [reference_number] [subscription] [interval] [interval_count]
-```
-
-- `[subscription]`: Set to `true` to create a recurring payment (otherwise omit or use `false` for one-time)
-- `[interval]`: Billing interval, e.g. `month`, `week`, `year` (default: `month`)
-- `[interval_count]`: How many intervals per billing period, e.g. `1` for every month, `3` for every 3 months (default: `1`)
-
-**Examples:**
-- `/create-stripe-link 19.99 "Web Hosting" 2024-INV-001 true month 1` (monthly subscription)
-- `/create-stripe-link 99.00 "Consulting Retainer" 2024-INV-002 true year 1` (yearly subscription)
-- `/create-stripe-link 50.00 "Quarterly Service" 2024-INV-003 true month 3` (every 3 months)
-
-If you omit the subscription arguments, a one-time payment link will be created as before.
+You can create recurring (subscription) payment links with Stripe by selecting the subscription options in the modal. The modal will allow you to choose the billing interval and frequency.
 
 ## Notes
+- **The bot must be invited to any channel you want it to post in.** Use `/invite @your-bot-name` in the channel.
 - Ensure your server is publicly accessible for Slack to send requests.
-- This server should be available at YOUR_BASE_URL. This URL would be used in Slack App settings for the slash commands.
+- This server should be available at YOUR_BASE_URL. This URL would be used in Slack App settings for the slash commands and interactivity.
+- **Direct argument parsing in slash commands is no longer supported.** All input is via the modal.
+
+## Required Slack Bot Scopes
+- `chat:write` (to post messages)
+- `chat:write.public` (optional, to post in channels the bot isn't a member of)
+- `commands` (for slash commands)
+- For private channels: `groups:write` (if you want to post in private channels)
+
+## Troubleshooting
+
+### Bot can't post messages (`missing_scope`)
+- Make sure your bot has the `chat:write` scope (and `chat:write.public` if needed).
+- After adding scopes, reinstall the app to your workspace.
+
+### Bot can't post to a channel (`channel_not_found`)
+- Make sure the bot is invited to the channel with `/invite @your-bot-name`.
+- For private channels, the bot must be a member and may need `groups:write` scope.
+- If you want the bot to always DM the user, you can update the code to use the user ID as the channel.
+
+### Modal won't open (`invalid_arguments`)
+- Slack modal titles must be 24 characters or fewer.
+- All block IDs and action IDs must be unique and non-empty.
+- All required fields must be present in the modal JSON.
+
+### Slack can't reach your server (`We're having trouble connecting. Try again?`)
+- Your server must be publicly accessible (use [ngrok](https://ngrok.com/) or similar for local development).
+- The Interactivity Request URL in your Slack app must be correct and use HTTPS.
+- Your handler must respond within 3 seconds.
+
+### Airwallex authentication fails
+- Airwallex may return 201 Created instead of 200 OK for authentication. The bot now accepts both as success.
+
+---
+
+For any other issues, check your server logs and Slack app logs for more details.

@@ -151,10 +151,8 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 	if interaction.Channel.ID != "" {
 		channelID = interaction.Channel.ID
 	}
-	if interaction.View.PrivateMetadata != "" {
-		// Optionally use PrivateMetadata for channel ID
-	}
 
+	log.Printf("Sending payment link message to user: %s, channel: %s, payment link: %s, provider: %s", interaction.User.ID, channelID, paymentLink, provider)
 	s.SendPaymentLinkMessage(interaction.User.ID, channelID, paymentData, paymentLink, provider)
 	w.WriteHeader(http.StatusOK)
 }
