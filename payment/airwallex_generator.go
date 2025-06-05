@@ -1,4 +1,4 @@
-package main
+package payment
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"paymentbot/models"
 )
 
 // AirwallexGenerator implements PaymentLinkGenerator for Airwallex
@@ -29,7 +31,7 @@ func NewAirwallexGenerator(clientID, apiKey, baseURL string) PaymentLinkGenerato
 }
 
 // GenerateLink creates an Airwallex payment link
-func (a *AirwallexGenerator) GenerateLink(data *PaymentLinkData) (string, error) {
+func (a *AirwallexGenerator) GenerateLink(data *models.PaymentLinkData) (string, error) {
 	log.Printf("[Airwallex] GenerateLink called with: %+v", data)
 
 	// Authenticate and get token
@@ -99,7 +101,7 @@ func (a *AirwallexGenerator) authenticate() (string, error) {
 }
 
 // createPaymentLink creates a payment link via Airwallex API
-func (a *AirwallexGenerator) createPaymentLink(token string, data *PaymentLinkData) (string, error) {
+func (a *AirwallexGenerator) createPaymentLink(token string, data *models.PaymentLinkData) (string, error) {
 	requestBody := a.buildPaymentLinkRequest(data)
 	bodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
@@ -152,7 +154,7 @@ func (a *AirwallexGenerator) createPaymentLink(token string, data *PaymentLinkDa
 }
 
 // buildPaymentLinkRequest constructs the request body for Airwallex payment link creation
-func (a *AirwallexGenerator) buildPaymentLinkRequest(data *PaymentLinkData) map[string]interface{} {
+func (a *AirwallexGenerator) buildPaymentLinkRequest(data *models.PaymentLinkData) map[string]interface{} {
 	requestBody := map[string]interface{}{
 		"amount":      data.Amount,
 		"currency":    "USD",

@@ -1,14 +1,16 @@
-package main
+package utils
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
+
+	"paymentbot/models"
 )
 
-// splitArgsQuoted splits a command string into arguments, treating quoted substrings as single arguments.
-func splitArgsQuoted(input string) []string {
+// SplitArgsQuoted splits a command string into arguments, treating quoted substrings as single arguments.
+func SplitArgsQuoted(input string) []string {
 	var args []string
 	var current strings.Builder
 	inQuotes := false
@@ -46,10 +48,10 @@ func splitArgsQuoted(input string) []string {
 	return args
 }
 
-// parseCommandArguments parses the text from a Slack slash command.
+// ParseCommandArguments parses the text from a Slack slash command.
 // Format: <amount> "<service_name>" <reference_number>
-func parseCommandArguments(text string) (*PaymentLinkData, error) {
-	parts := splitArgsQuoted(text)
+func ParseCommandArguments(text string) (*models.PaymentLinkData, error) {
+	parts := SplitArgsQuoted(text)
 
 	if len(parts) < 2 {
 		return nil, fmt.Errorf("invalid format. Usage: <amount> \"<service_name>\" [reference_number]")
@@ -89,7 +91,7 @@ func parseCommandArguments(text string) (*PaymentLinkData, error) {
 		if isSubscription {
 			if len(parts) > 4 {
 				interval = strings.ToLower(strings.TrimSpace(parts[4]))
-				if !isValidInterval(interval) {
+				if !IsValidInterval(interval) {
 					return nil, fmt.Errorf("invalid interval '%s'. Must be one of: month, week, year", interval)
 				}
 			}
@@ -107,7 +109,7 @@ func parseCommandArguments(text string) (*PaymentLinkData, error) {
 		}
 	}
 
-	return &PaymentLinkData{
+	return &models.PaymentLinkData{
 		Amount:          amount,
 		ServiceName:     serviceName,
 		ReferenceNumber: referenceNumber,
@@ -117,8 +119,8 @@ func parseCommandArguments(text string) (*PaymentLinkData, error) {
 	}, nil
 }
 
-// isValidInterval checks if the provided interval is valid
-func isValidInterval(interval string) bool {
+// IsValidInterval checks if the provided interval is valid
+func IsValidInterval(interval string) bool {
 	validIntervals := map[string]bool{
 		"month": true,
 		"week":  true,

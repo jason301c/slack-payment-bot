@@ -1,4 +1,4 @@
-package main
+package models
 
 // PaymentLinkData represents the data needed to create a payment link
 type PaymentLinkData struct {
@@ -17,19 +17,3 @@ const (
 	ProviderStripe    PaymentProvider = "stripe"
 	ProviderAirwallex PaymentProvider = "airwallex"
 )
-
-// PaymentLinkGenerator interface for payment link generation
-type PaymentLinkGenerator interface {
-	GenerateLink(data *PaymentLinkData) (string, error)
-}
-
-// Config holds application configuration
-type Config struct {
-	SlackBotToken      string
-	SlackSigningSecret string
-	Port               string
-	StripeAPIKey       string
-	AirwallexClientID  string
-	AirwallexAPIKey    string
-	AirwallexBaseURL   string
-}

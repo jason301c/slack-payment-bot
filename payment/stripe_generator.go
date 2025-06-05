@@ -1,4 +1,4 @@
-package main
+package payment
 
 import (
 	"fmt"
@@ -8,6 +8,8 @@ import (
 	"github.com/stripe/stripe-go/v82/paymentlink"
 	"github.com/stripe/stripe-go/v82/price"
 	"github.com/stripe/stripe-go/v82/product"
+
+	"paymentbot/models"
 )
 
 // StripeGenerator implements PaymentLinkGenerator for Stripe
@@ -23,7 +25,7 @@ func NewStripeGenerator(apiKey string) PaymentLinkGenerator {
 }
 
 // GenerateLink creates a Stripe payment link (one-time or recurring)
-func (s *StripeGenerator) GenerateLink(data *PaymentLinkData) (string, error) {
+func (s *StripeGenerator) GenerateLink(data *models.PaymentLinkData) (string, error) {
 	stripe.Key = s.apiKey
 
 	// Create a product
@@ -58,7 +60,7 @@ func (s *StripeGenerator) GenerateLink(data *PaymentLinkData) (string, error) {
 }
 
 // buildPriceParams constructs Stripe price parameters based on payment data
-func (s *StripeGenerator) buildPriceParams(data *PaymentLinkData, productID string) *stripe.PriceParams {
+func (s *StripeGenerator) buildPriceParams(data *models.PaymentLinkData, productID string) *stripe.PriceParams {
 	priceParams := &stripe.PriceParams{
 		Currency:   stripe.String("usd"),
 		UnitAmount: stripe.Int64(int64(data.Amount * 100)), // Convert to cents
@@ -86,7 +88,7 @@ func (s *StripeGenerator) buildPriceParams(data *PaymentLinkData, productID stri
 }
 
 // buildPaymentLinkParams constructs Stripe payment link parameters
-func (s *StripeGenerator) buildPaymentLinkParams(data *PaymentLinkData, priceID string) *stripe.PaymentLinkParams {
+func (s *StripeGenerator) buildPaymentLinkParams(data *models.PaymentLinkData, priceID string) *stripe.PaymentLinkParams {
 	params := &stripe.PaymentLinkParams{
 		LineItems: []*stripe.PaymentLinkLineItemParams{
 			{
