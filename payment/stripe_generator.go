@@ -25,7 +25,7 @@ func NewStripeGenerator(apiKey string) PaymentLinkGenerator {
 }
 
 // GenerateLink creates a Stripe payment link (one-time or recurring)
-func (s *StripeGenerator) GenerateLink(data *models.PaymentLinkData) (string, error) {
+func (s *StripeGenerator) GenerateLink(data *models.PaymentLinkData) (string, string, error) {
 	stripe.Key = s.apiKey
 
 	// Create a product
@@ -36,7 +36,7 @@ func (s *StripeGenerator) GenerateLink(data *models.PaymentLinkData) (string, er
 	product, err := product.New(productParams)
 	if err != nil {
 		log.Printf("Stripe product error: %v", err)
-		return "", fmt.Errorf("failed to create Stripe product: %w", err)
+		return "", "", fmt.Errorf("failed to create Stripe product: %w", err)
 	}
 
 	// Create a price (recurring or one-time)
@@ -44,7 +44,7 @@ func (s *StripeGenerator) GenerateLink(data *models.PaymentLinkData) (string, er
 	price, err := price.New(priceParams)
 	if err != nil {
 		log.Printf("Stripe price error: %v", err)
-		return "", fmt.Errorf("failed to create Stripe price: %w", err)
+		return "", "", fmt.Errorf("failed to create Stripe price: %w", err)
 	}
 
 	// Create a payment link
@@ -52,11 +52,11 @@ func (s *StripeGenerator) GenerateLink(data *models.PaymentLinkData) (string, er
 	link, err := paymentlink.New(linkParams)
 	if err != nil {
 		log.Printf("Stripe payment link error: %v", err)
-		return "", fmt.Errorf("failed to create Stripe payment link: %w", err)
+		return "", "", fmt.Errorf("failed to create Stripe payment link: %w", err)
 	}
 
-	log.Printf("Successfully created Stripe payment link: %s", link.URL)
-	return link.URL, nil
+	log.Printf("Successfully created Stripe payment link: %s (ID: %s)", link.URL, link.ID)
+	return link.URL, link.ID, nil
 }
 
 // buildPriceParams constructs Stripe price parameters based on payment data

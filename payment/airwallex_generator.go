@@ -31,25 +31,25 @@ func NewAirwallexGenerator(clientID, apiKey, baseURL string) PaymentLinkGenerato
 }
 
 // GenerateLink creates an Airwallex payment link
-func (a *AirwallexGenerator) GenerateLink(data *models.PaymentLinkData) (string, error) {
+func (a *AirwallexGenerator) GenerateLink(data *models.PaymentLinkData) (string, string, error) {
 	log.Printf("[Airwallex] GenerateLink called with: %+v", data)
 
 	// Authenticate and get token
 	token, err := a.authenticate()
 	if err != nil {
 		log.Printf("[Airwallex] Auth error: %v", err)
-		return "", fmt.Errorf("failed to authenticate with Airwallex: %w", err)
+		return "", "", fmt.Errorf("failed to authenticate with Airwallex: %w", err)
 	}
 
 	// Create payment link
-	link, err := a.createPaymentLink(token, data)
+	link, id, err := a.createPaymentLink(token, data)
 	if err != nil {
 		log.Printf("[Airwallex] Link creation error: %v", err)
-		return "", fmt.Errorf("failed to create Airwallex payment link: %w", err)
+		return "", "", fmt.Errorf("failed to create Airwallex payment link: %w", err)
 	}
 
-	log.Printf("[Airwallex] Successfully created payment link: %s", link)
-	return link, nil
+	log.Printf("[Airwallex] Successfully created payment link: %s (ID: %s)", link, id)
+	return link, id, nil
 }
 
 // authenticate authenticates with Airwallex and returns a bearer token
@@ -101,11 +101,11 @@ func (a *AirwallexGenerator) authenticate() (string, error) {
 }
 
 // createPaymentLink creates a payment link via Airwallex API
-func (a *AirwallexGenerator) createPaymentLink(token string, data *models.PaymentLinkData) (string, error) {
+func (a *AirwallexGenerator) createPaymentLink(token string, data *models.PaymentLinkData) (string, string, error) {
 	requestBody := a.buildPaymentLinkRequest(data)
 	bodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request body: %w", err)
+		return "", "", fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
 	log.Printf("[Airwallex] Creating payment link with body: %s", string(bodyBytes))
@@ -113,7 +113,7 @@ func (a *AirwallexGenerator) createPaymentLink(token string, data *models.Paymen
 	url := a.baseURL + "/api/v1/pa/payment_links/create"
 	req, err := http.NewRequest("POST", url, bytes.NewReader(bodyBytes))
 	if err != nil {
-		return "", fmt.Errorf("failed to create payment link request: %w", err)
+		return "", "", fmt.Errorf("failed to create payment link request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -122,35 +122,36 @@ func (a *AirwallexGenerator) createPaymentLink(token string, data *models.Paymen
 	log.Printf("[Airwallex] POST %s", url)
 	resp, err := a.client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to send payment link request: %w", err)
+		return "", "", fmt.Errorf("failed to send payment link request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read payment link response: %w", err)
+		return "", "", fmt.Errorf("failed to read payment link response: %w", err)
 	}
 
 	log.Printf("[Airwallex] Payment link response status: %s", resp.Status)
 	log.Printf("[Airwallex] Payment link response body: %s", string(respBody))
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("payment link creation failed with status %d: %s", resp.StatusCode, string(respBody))
+		return "", "", fmt.Errorf("payment link creation failed with status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	var result struct {
 		PaymentLinkUrl string `json:"url"`
+		ID             string `json:"id"`
 	}
 
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return "", fmt.Errorf("failed to parse payment link response: %w", err)
+		return "", "", fmt.Errorf("failed to parse payment link response: %w", err)
 	}
 
 	if result.PaymentLinkUrl == "" {
-		return "", fmt.Errorf("payment link URL not found in response")
+		return "", "", fmt.Errorf("payment link URL not found in response")
 	}
 
-	return result.PaymentLinkUrl, nil
+	return result.PaymentLinkUrl, result.ID, nil
 }
 
 // buildPaymentLinkRequest constructs the request body for Airwallex payment link creation

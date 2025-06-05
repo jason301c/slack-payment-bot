@@ -53,26 +53,29 @@ func (s *SlackService) OpenPaymentLinkModal(triggerID string, provider models.Pa
 	return nil
 }
 
-func (s *SlackService) GenerateLinkForProvider(data *models.PaymentLinkData, provider models.PaymentProvider) (string, error) {
-	var paymentLink string
+func (s *SlackService) GenerateLinkForProvider(data *models.PaymentLinkData, provider models.PaymentProvider) (string, string, error) {
+	var paymentLink, paymentID string
 	var generationErr error
 
 	switch provider {
 	case models.ProviderStripe:
-		paymentLink, generationErr = s.stripeGenerator.GenerateLink(data)
+		paymentLink, paymentID, generationErr = s.stripeGenerator.GenerateLink(data)
 	case models.ProviderAirwallex:
-		paymentLink, generationErr = s.airwallexGenerator.GenerateLink(data)
+		paymentLink, paymentID, generationErr = s.airwallexGenerator.GenerateLink(data)
 	default:
-		return "", fmt.Errorf("unknown provider: %s", provider)
+		return "", "", fmt.Errorf("unknown provider: %s", provider)
 	}
-	return paymentLink, generationErr
+	return paymentLink, paymentID, generationErr
 }
 
-func (s *SlackService) SendPaymentLinkMessage(userID, channelID string, data *models.PaymentLinkData, link string, provider models.PaymentProvider) {
+func (s *SlackService) SendPaymentLinkMessage(userID, channelID string, data *models.PaymentLinkData, link, paymentID string, provider models.PaymentProvider) {
 	msg := fmt.Sprintf(
 		"<@%s> Here is your %s payment link for *%s* (Amount: $%.2f):\n%s",
 		userID, strings.Title(string(provider)), data.ServiceName, data.Amount, link,
 	)
+	if paymentID != "" {
+		msg += fmt.Sprintf("\nPayment ID: `%s`", paymentID)
+	}
 	_, _, err := s.client.PostMessage(channelID, slack.MsgOptionText(msg, false))
 	if err != nil {
 		log.Printf("Error sending payment link message: %v", err)
@@ -140,7 +143,7 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 		IntervalCount:   intervalCount,
 	}
 
-	paymentLink, generationErr := s.GenerateLinkForProvider(paymentData, provider)
+	paymentLink, paymentID, generationErr := s.GenerateLinkForProvider(paymentData, provider)
 	if generationErr != nil {
 		log.Printf("Error generating %s payment link: %v", provider, generationErr)
 		respondWithError(w, "", fmt.Sprintf("Error generating payment link: %v", generationErr))
@@ -153,8 +156,8 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 		channelID = interaction.User.ID
 	}
 
-	log.Printf("Sending payment link message to user: %s, channel: %s, payment link: %s, provider: %s", interaction.User.ID, channelID, paymentLink, provider)
-	s.SendPaymentLinkMessage(interaction.User.ID, channelID, paymentData, paymentLink, provider)
+	log.Printf("Sending payment link message to user: %s, channel: %s, payment link: %s, payment ID: %s, provider: %s", interaction.User.ID, channelID, paymentLink, paymentID, provider)
+	s.SendPaymentLinkMessage(interaction.User.ID, channelID, paymentData, paymentLink, paymentID, provider)
 	w.WriteHeader(http.StatusOK)
 }
 

@@ -30,9 +30,9 @@ func BuildPaymentModalView(provider models.PaymentProvider) slack.ModalViewReque
 	serviceBlock := slack.NewInputBlock("service_block", serviceLabel, nil, serviceElement)
 	serviceBlock.Optional = false
 
-	referenceLabel := newPlainTextBlock("Reference Number")
-	referencePlaceholder := newPlainTextBlock("e.g., INV-2024-001")
-	referenceHint := newPlainTextBlock("Leave empty for auto-generated reference")
+	referenceLabel := newPlainTextBlock("Description")
+	referencePlaceholder := newPlainTextBlock("")
+	referenceHint := newPlainTextBlock("Appears at checkout, on the customer portal, and in quotes.")
 	referenceElement := slack.NewPlainTextInputBlockElement(referencePlaceholder, "reference_input")
 	referenceBlock := slack.NewInputBlock("reference_block", referenceLabel, referenceHint, referenceElement)
 	referenceBlock.Optional = true
