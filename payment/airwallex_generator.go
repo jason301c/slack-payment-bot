@@ -83,7 +83,7 @@ func (a *AirwallexGenerator) authenticate() (string, error) {
 	log.Printf("[Airwallex] Auth response status: %s", resp.Status)
 	log.Printf("[Airwallex] Auth response body: %s", string(respBody))
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return "", fmt.Errorf("authentication failed with status %d: %s", resp.StatusCode, string(respBody))
 	}
 
