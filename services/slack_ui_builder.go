@@ -14,7 +14,7 @@ func newPlainTextBlock(text string) *slack.TextBlockObject {
 }
 
 func BuildPaymentModalView(provider models.PaymentProvider) slack.ModalViewRequest {
-	modalTitle := newPlainTextBlock(fmt.Sprintf("Create %s Payment Link", strings.Title(string(provider))))
+	modalTitle := newPlainTextBlock(fmt.Sprintf("%s Payment", strings.Title(string(provider))))
 	submitText := newPlainTextBlock("Create Link")
 	closeText := newPlainTextBlock("Cancel")
 
