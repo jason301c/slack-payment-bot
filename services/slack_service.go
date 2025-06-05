@@ -147,9 +147,10 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 		return
 	}
 
-	channelID := ""
-	if interaction.Channel.ID != "" {
-		channelID = interaction.Channel.ID
+	channelID := interaction.Channel.ID
+	if channelID == "" {
+		// Fallback to DM the user if no channel context is available
+		channelID = interaction.User.ID
 	}
 
 	log.Printf("Sending payment link message to user: %s, channel: %s, payment link: %s, provider: %s", interaction.User.ID, channelID, paymentLink, provider)
