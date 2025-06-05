@@ -78,7 +78,13 @@ func (s *SlackService) SendPaymentLinkMessage(userID, channelID string, data *mo
 	}
 	_, _, err := s.client.PostMessage(channelID, slack.MsgOptionText(msg, false))
 	if err != nil {
-		log.Printf("Error sending payment link message: %v", err)
+		log.Printf("Error sending payment link message to channel %s: %v", channelID, err)
+		// Fallback: send to user's DM with debug note
+		debugMsg := msg + fmt.Sprintf("\n\n:warning: _This message was not sent to the channel because of: %v. Perhaps add the bot to the channel?_", err)
+		_, _, dmErr := s.client.PostMessage(userID, slack.MsgOptionText(debugMsg, false))
+		if dmErr != nil {
+			log.Printf("Error sending fallback DM to user %s: %v", userID, dmErr)
+		}
 	}
 }
 
