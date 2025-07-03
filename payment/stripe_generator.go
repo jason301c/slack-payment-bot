@@ -96,12 +96,11 @@ func (s *StripeGenerator) buildPaymentLinkParams(data *models.PaymentLinkData, p
 				Quantity: stripe.Int64(1),
 			},
 		},
-		// Enable customer creation to allow saving payment details
-		CustomerCreation: stripe.String("always"),
 	}
 
-	// For one-time payments, save card for future use
+	// For one-time payments, enable customer creation and save card for future use
 	if !data.IsSubscription {
+		params.CustomerCreation = stripe.String("always")
 		params.PaymentIntentData = &stripe.PaymentLinkPaymentIntentDataParams{
 			SetupFutureUsage: stripe.String("off_session"),
 		}
