@@ -71,7 +71,14 @@ func BuildPaymentModalView(provider models.PaymentProvider, privateMetadata stri
 		countBlock := slack.NewInputBlock("interval_count_block", countLabel, nil, countElement)
 		countBlock.Optional = true
 
-		allBlocks = append(allBlocks, subscriptionBlock, intervalBlock, countBlock)
+		endDateLabel := newPlainTextBlock("End Date (optional)")
+		endDatePlaceholder := newPlainTextBlock("Enter number of cycles (e.g., 6)")
+		endDateHint := newPlainTextBlock("Leave empty for no end date. Enter a number to limit subscription to that many billing cycles.")
+		endDateElement := slack.NewPlainTextInputBlockElement(endDatePlaceholder, "end_date_input")
+		endDateBlock := slack.NewInputBlock("end_date_block", endDateLabel, endDateHint, endDateElement)
+		endDateBlock.Optional = true
+
+		allBlocks = append(allBlocks, subscriptionBlock, intervalBlock, countBlock, endDateBlock)
 	}
 
 	if provider == models.ProviderAirwallex {

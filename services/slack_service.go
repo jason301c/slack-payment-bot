@@ -76,6 +76,9 @@ func (s *SlackService) SendPaymentLinkMessage(userID, channelID string, data *mo
 	if paymentID != "" {
 		msg += fmt.Sprintf("\nPayment ID: `%s`", paymentID)
 	}
+	if data.IsSubscription && data.EndDateCycles > 0 {
+		msg += fmt.Sprintf("\nEnd Date: %d cycles (%d %s payments)", data.EndDateCycles, data.EndDateCycles, data.Interval)
+	}
 	_, _, err := s.client.PostMessage(channelID, slack.MsgOptionText(msg, false))
 	if err != nil {
 		log.Printf("Error sending payment link message to channel %s: %v", channelID, err)
@@ -115,6 +118,7 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 	isSubscription := false
 	interval := "month"
 	intervalCount := int64(1)
+	endDateCycles := int64(0)
 
 	if provider == models.ProviderStripe {
 		// Check for subscription checkbox
@@ -138,6 +142,21 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 				}
 			}
 		}
+		// End date cycles input
+		if endDateBlock, ok := values["end_date_block"]; ok {
+			if endDateElem, ok := endDateBlock["end_date_input"]; ok && endDateElem.Value != "" {
+				parsed, err := strconv.ParseInt(strings.TrimSpace(endDateElem.Value), 10, 64)
+				if err != nil {
+					respondWithError(w, "end_date_block", "Please enter a valid number for end date cycles")
+					return
+				}
+				if parsed <= 0 {
+					respondWithError(w, "end_date_block", "End date cycles must be a positive number")
+					return
+				}
+				endDateCycles = parsed
+			}
+		}
 	}
 
 	internalReference := ""
@@ -152,6 +171,7 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 		IsSubscription:    isSubscription,
 		Interval:          interval,
 		IntervalCount:     intervalCount,
+		EndDateCycles:     endDateCycles,
 		InternalReference: internalReference,
 	}
 
