@@ -8,6 +8,7 @@ type PaymentLinkData struct {
 	IsSubscription    bool    `json:"is_subscription"`
 	Interval          string  `json:"interval"`           // e.g. "month", "week", "year"
 	IntervalCount     int64   `json:"interval_count"`     // e.g. 1 for every month, 3 for every 3 months
+	EndDateCycles     int64   `json:"end_date_cycles"`    // number of cycles before subscription ends (optional)
 	InternalReference string  `json:"internal_reference"` // Airwallex internal reference (optional)
 }
 
