@@ -35,9 +35,13 @@ func main() {
 	// Initialize Slack Handler
 	slackHandler := handlers.NewSlackHandler(slackService)
 
+	// Initialize Stripe Webhook Handler
+	stripeWebhookHandler := handlers.NewStripeWebhookHandler(appConfig.StripeWebhookSecret, appConfig.StripeAPIKey)
+
 	// Register handlers
 	http.HandleFunc("/slack/commands", slackHandler.HandleSlackCommands)
 	http.HandleFunc("/slack/interactions", slackHandler.HandleSlackInteractions)
+	http.HandleFunc("/stripe/webhook", stripeWebhookHandler.HandleWebhook)
 
 	log.Printf("Registered handlers. Ready to receive requests.")
 	log.Fatal(http.ListenAndServe(":"+appConfig.Port, nil))
