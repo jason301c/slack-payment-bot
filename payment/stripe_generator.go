@@ -3,6 +3,7 @@ package payment
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/paymentlink"
@@ -104,7 +105,62 @@ func (s *StripeGenerator) buildPaymentLinkParams(data *models.PaymentLinkData, p
 		params.PaymentIntentData = &stripe.PaymentLinkPaymentIntentDataParams{
 			SetupFutureUsage: stripe.String("off_session"),
 		}
+	} else {
+		// For subscriptions, add metadata to track cycle limits
+		log.Printf("[Stripe] Creating subscription payment link for service: %s", data.ServiceName)
+		metadata := make(map[string]string)
+		metadata["service_name"] = data.ServiceName
+		metadata["reference_number"] = data.ReferenceNumber
+
+		if data.EndDateCycles > 0 {
+			endTimestamp := calculateEndTimestamp(data.Interval, data.IntervalCount, data.EndDateCycles)
+			metadata["end_date_cycles"] = fmt.Sprintf("%d", data.EndDateCycles)
+			metadata["end_timestamp"] = fmt.Sprintf("%d", endTimestamp)
+			metadata["interval"] = data.Interval
+			metadata["interval_count"] = fmt.Sprintf("%d", data.IntervalCount)
+			
+			endTime := time.Unix(endTimestamp, 0)
+			log.Printf("[Stripe] Subscription will be limited to %d cycles (%s every %d %s(s))", 
+				data.EndDateCycles, data.Interval, data.IntervalCount, data.Interval)
+			log.Printf("[Stripe] Calculated end timestamp: %d (%s)", endTimestamp, endTime.Format("2006-01-02 15:04:05 UTC"))
+			log.Printf("[Stripe] Subscription metadata: %+v", metadata)
+		} else {
+			log.Printf("[Stripe] Creating unlimited subscription (no EndDateCycles specified)")
+		}
+
+		params.SubscriptionData = &stripe.PaymentLinkSubscriptionDataParams{
+			Metadata: metadata,
+		}
 	}
 
 	return params
+}
+
+// calculateEndTimestamp calculates the Unix timestamp when subscription should end
+func calculateEndTimestamp(interval string, intervalCount int64, endDateCycles int64) int64 {
+	if endDateCycles <= 0 {
+		return 0
+	}
+
+	now := time.Now()
+	var duration time.Duration
+
+	switch interval {
+	case "day":
+		duration = time.Duration(intervalCount*endDateCycles) * 24 * time.Hour
+	case "week":
+		duration = time.Duration(intervalCount*endDateCycles) * 7 * 24 * time.Hour
+	case "month":
+		// Approximate month as 30 days
+		duration = time.Duration(intervalCount*endDateCycles) * 30 * 24 * time.Hour
+	case "year":
+		// Approximate year as 365 days
+		duration = time.Duration(intervalCount*endDateCycles) * 365 * 24 * time.Hour
+	default:
+		// Default to month if interval is unknown
+		duration = time.Duration(intervalCount*endDateCycles) * 30 * 24 * time.Hour
+	}
+
+	endTime := now.Add(duration)
+	return endTime.Unix()
 }

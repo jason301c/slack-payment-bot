@@ -7,24 +7,26 @@ import (
 
 // Config holds application configuration
 type Config struct {
-	SlackBotToken      string
-	SlackSigningSecret string
-	Port               string
-	StripeAPIKey       string
-	AirwallexClientID  string
-	AirwallexAPIKey    string
-	AirwallexBaseURL   string
+	SlackBotToken       string
+	SlackSigningSecret  string
+	Port                string
+	StripeAPIKey        string
+	StripeWebhookSecret string
+	AirwallexClientID   string
+	AirwallexAPIKey     string
+	AirwallexBaseURL    string
 }
 
 func LoadConfig() *Config {
 	cfg := &Config{
-		SlackBotToken:      os.Getenv("SLACK_BOT_TOKEN"),
-		SlackSigningSecret: os.Getenv("SLACK_SIGNING_SECRET"),
-		Port:               os.Getenv("PORT"),
-		StripeAPIKey:       os.Getenv("STRIPE_API_KEY"),
-		AirwallexClientID:  os.Getenv("AIRWALLEX_CLIENT_ID"),
-		AirwallexAPIKey:    os.Getenv("AIRWALLEX_API_KEY"),
-		AirwallexBaseURL:   os.Getenv("AIRWALLEX_BASE_URL"),
+		SlackBotToken:       os.Getenv("SLACK_BOT_TOKEN"),
+		SlackSigningSecret:  os.Getenv("SLACK_SIGNING_SECRET"),
+		Port:                os.Getenv("PORT"),
+		StripeAPIKey:        os.Getenv("STRIPE_API_KEY"),
+		StripeWebhookSecret: os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		AirwallexClientID:   os.Getenv("AIRWALLEX_CLIENT_ID"),
+		AirwallexAPIKey:     os.Getenv("AIRWALLEX_API_KEY"),
+		AirwallexBaseURL:    os.Getenv("AIRWALLEX_BASE_URL"),
 	}
 
 	if cfg.SlackBotToken == "" {
