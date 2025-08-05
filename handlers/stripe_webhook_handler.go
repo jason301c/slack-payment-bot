@@ -138,8 +138,7 @@ func (h *StripeWebhookHandler) scheduleSubscriptionCancellation(subscriptionID s
 	stripe.Key = h.stripeAPIKey
 
 	params := &stripe.SubscriptionParams{
-		CancelAt:          stripe.Int64(cancelAtTimestamp),
-		CancelAtPeriodEnd: stripe.Bool(true),
+		CancelAt: stripe.Int64(cancelAtTimestamp),
 	}
 
 	log.Printf("[Webhook] Calling Stripe API to update subscription %s with cancellation params", subscriptionID)
