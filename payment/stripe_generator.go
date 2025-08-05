@@ -118,9 +118,9 @@ func (s *StripeGenerator) buildPaymentLinkParams(data *models.PaymentLinkData, p
 			metadata["end_timestamp"] = fmt.Sprintf("%d", endTimestamp)
 			metadata["interval"] = data.Interval
 			metadata["interval_count"] = fmt.Sprintf("%d", data.IntervalCount)
-			
+
 			endTime := time.Unix(endTimestamp, 0)
-			log.Printf("[Stripe] Subscription will be limited to %d cycles (%s every %d %s(s))", 
+			log.Printf("[Stripe] Subscription will be limited to %d cycles (%s every %d %s(s))",
 				data.EndDateCycles, data.Interval, data.IntervalCount, data.Interval)
 			log.Printf("[Stripe] Calculated end timestamp: %d (%s)", endTimestamp, endTime.Format("2006-01-02 15:04:05 UTC"))
 			log.Printf("[Stripe] Subscription metadata: %+v", metadata)
@@ -131,6 +131,8 @@ func (s *StripeGenerator) buildPaymentLinkParams(data *models.PaymentLinkData, p
 		params.SubscriptionData = &stripe.PaymentLinkSubscriptionDataParams{
 			Metadata: metadata,
 		}
+		// Also add metadata to the payment link itself
+		params.Metadata = metadata
 	}
 
 	return params
