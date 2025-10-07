@@ -70,9 +70,15 @@ func (s *SlackService) GenerateLinkForProvider(data *models.PaymentLinkData, pro
 }
 
 func (s *SlackService) SendPaymentLinkMessage(userID, channelID string, data *models.PaymentLinkData, link, paymentID string, provider models.PaymentProvider) {
+	providerStr := string(provider)
+	if providerStr == "stripe" {
+		providerStr = "Stripe"
+	} else if providerStr == "airwallex" {
+		providerStr = "Airwallex"
+	}
 	msg := fmt.Sprintf(
 		"<@%s> Here is your %s payment link for *%s* (Amount: $%.2f):\n%s",
-		userID, strings.Title(string(provider)), data.ServiceName, data.Amount, link,
+		userID, providerStr, data.ServiceName, data.Amount, link,
 	)
 	if paymentID != "" {
 		msg += fmt.Sprintf("\nPayment ID: `%s`", paymentID)
@@ -202,9 +208,9 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 func (s *SlackService) OpenInvoiceModal(triggerID, channelID, teamID string) error {
 	log.Printf("Opening invoice modal for channel: %s", channelID)
 
-	// Get the next invoice number
+	// Get the next invoice number using the current channel
 	ctx := context.Background()
-	lastInvoiceNumber, err := s.invoiceService.GetLastInvoiceNumber(ctx, teamID)
+	lastInvoiceNumber, err := s.invoiceService.GetLastInvoiceNumber(ctx, teamID, channelID)
 	if err != nil {
 		log.Printf("Error getting last invoice number: %v", err)
 		lastInvoiceNumber = 1000 // fallback
@@ -226,6 +232,18 @@ func (s *SlackService) ProcessInvoiceSubmission(w http.ResponseWriter, interacti
 
 	values := interaction.View.State.Values
 
+	// Get channel ID early since we need it for invoice number generation
+	channelID := interaction.Channel.ID
+	if channelID == "" {
+		// Try to get channel from private metadata
+		if interaction.View.PrivateMetadata != "" {
+			channelID = interaction.View.PrivateMetadata
+		} else {
+			// Fallback to DM the user if no channel context is available
+			channelID = interaction.User.ID
+		}
+	}
+
 	// Parse invoice data from modal
 	invoice, err := s.invoiceService.ParseInvoiceDataFromModal(values)
 	if err != nil {
@@ -237,9 +255,9 @@ func (s *SlackService) ProcessInvoiceSubmission(w http.ResponseWriter, interacti
 	// Handle the case where override field is empty - we need to use the auto-generated number
 	overrideInvoiceNumber := values["invoice_number_block"]["invoice_number_input"].Value
 	if strings.TrimSpace(overrideInvoiceNumber) == "" {
-		// No override provided, we need to get the next invoice number
+		// No override provided, we need to get the next invoice number using current channel
 		ctx := context.Background()
-		lastInvoiceNumber, err := s.invoiceService.GetLastInvoiceNumber(ctx, interaction.Team.ID)
+		lastInvoiceNumber, err := s.invoiceService.GetLastInvoiceNumber(ctx, interaction.Team.ID, channelID)
 		if err != nil {
 			log.Printf("Error getting last invoice number: %v", err)
 			respondWithError(w, "", "Error generating invoice number. Please try again or specify a number manually.")
@@ -273,18 +291,6 @@ func (s *SlackService) ProcessInvoiceSubmission(w http.ResponseWriter, interacti
 		return
 	}
 
-	// Get channel ID
-	channelID := interaction.Channel.ID
-	if channelID == "" {
-		// Try to get channel from private metadata
-		if interaction.View.PrivateMetadata != "" {
-			channelID = interaction.View.PrivateMetadata
-		} else {
-			// Fallback to DM the user if no channel context is available
-			channelID = interaction.User.ID
-		}
-	}
-
 	// Send invoice to Slack
 	err = s.invoiceService.SendInvoiceToSlack(interaction.User.ID, channelID, invoice, pdfBytes)
 	if err != nil {
@@ -299,12 +305,12 @@ func (s *SlackService) ProcessInvoiceSubmission(w http.ResponseWriter, interacti
 	if err != nil {
 		log.Printf("Error converting invoice number to int: %v", err)
 	} else {
-		err = s.invoiceService.UpdateLastInvoiceNumber(ctx, interaction.Team.ID, invoiceNumInt)
+		err = s.invoiceService.UpdateLastInvoiceNumber(ctx, interaction.Team.ID, channelID, invoiceNumInt)
 		if err != nil {
 			log.Printf("Error updating last invoice number: %v", err)
 			// Don't fail the request if the counter update fails, just log it
 		} else {
-			log.Printf("Successfully updated invoice counter to %d for team %s", invoiceNumInt, interaction.Team.ID)
+			log.Printf("Successfully updated invoice counter to %d for team %s in channel %s", invoiceNumInt, interaction.Team.ID, channelID)
 		}
 	}
 

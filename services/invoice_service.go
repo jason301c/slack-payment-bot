@@ -25,92 +25,43 @@ func NewInvoiceService(slackClient *slack.Client) *InvoiceService {
 	}
 }
 
-// GetLastInvoiceNumber retrieves the last invoice number from a dedicated Slack channel
-func (is *InvoiceService) GetLastInvoiceNumber(ctx context.Context, teamID string) (int, error) {
-	// Use a special channel to store the invoice counter
-	// First, try to find the invoice counter channel by looking for a channel with a specific name
-	channels, _, err := is.slackClient.GetConversationsContext(ctx, &slack.GetConversationsParameters{
-		Types:           []string{"public_channel", "private_channel"},
-		ExcludeArchived: true,
-		Limit:           1000,
+// GetLastInvoiceNumber retrieves the last invoice number from the current channel
+func (is *InvoiceService) GetLastInvoiceNumber(ctx context.Context, teamID, channelID string) (int, error) {
+	// Try to find a message with invoice counter in the current channel
+	// Look for messages that contain only a number (invoice counter)
+	history, err := is.slackClient.GetConversationHistoryContext(ctx, &slack.GetConversationHistoryParameters{
+		ChannelID: channelID,
+		Limit:     100, // Check last 100 messages for counter
 	})
 	if err != nil {
-		log.Printf("Error getting conversations: %v", err)
+		log.Printf("Error getting conversation history for channel %s: %v", channelID, err)
 		return 1000, nil
 	}
 
-	var counterChannelID string
-	for _, channel := range channels {
-		if channel.Name == "invoice-counter" || channel.Name == "invoice_bot_counter" {
-			counterChannelID = channel.ID
-			break
+	// Search backwards through messages to find the last invoice counter
+	for _, message := range history.Messages {
+		text := strings.TrimSpace(message.Text)
+		// Check if message is just a number (potential invoice counter)
+		if lastInvoice, err := strconv.Atoi(text); err == nil {
+			log.Printf("Found last invoice number %d in channel %s", lastInvoice, channelID)
+			return lastInvoice, nil
 		}
 	}
 
-	// If no counter channel found, create one or return default
-	if counterChannelID == "" {
-		log.Printf("No invoice counter channel found, using default starting number 1000")
-		return 1000, nil
-	}
-
-	// Get the latest message from the counter channel
-	history, err := is.slackClient.GetConversationHistoryContext(ctx, &slack.GetConversationHistoryParameters{
-		ChannelID: counterChannelID,
-		Limit:     1,
-	})
-	if err != nil {
-		log.Printf("Error getting conversation history: %v", err)
-		return 1000, nil
-	}
-
-	if len(history.Messages) == 0 {
-		// No messages found, start with default
-		return 1000, nil
-	}
-
-	// Parse the last invoice number from the latest message
-	lastMessage := history.Messages[0].Text
-	lastInvoice, err := strconv.Atoi(strings.TrimSpace(lastMessage))
-	if err != nil {
-		log.Printf("Error parsing last invoice number from message '%s': %v", lastMessage, err)
-		return 1000, nil
-	}
-
-	return lastInvoice, nil
+	// No counter found in this channel, start with default
+	log.Printf("No invoice counter found in channel %s, using default starting number 1000", channelID)
+	return 1000, nil
 }
 
-// UpdateLastInvoiceNumber updates the last invoice number in the Slack counter channel
-func (is *InvoiceService) UpdateLastInvoiceNumber(ctx context.Context, teamID string, invoiceNumber int) error {
-	// Use a special channel to store the invoice counter
-	channels, _, err := is.slackClient.GetConversationsContext(ctx, &slack.GetConversationsParameters{
-		Types:           []string{"public_channel", "private_channel"},
-		ExcludeArchived: true,
-		Limit:           1000,
-	})
+// UpdateLastInvoiceNumber updates the last invoice number in the current channel
+func (is *InvoiceService) UpdateLastInvoiceNumber(ctx context.Context, teamID, channelID string, invoiceNumber int) error {
+	// Post the new invoice number to the current channel as a simple message
+	_, _, err := is.slackClient.PostMessageContext(ctx, channelID, slack.MsgOptionText(strconv.Itoa(invoiceNumber), false))
 	if err != nil {
-		return fmt.Errorf("failed to get conversations: %w", err)
+		return fmt.Errorf("failed to post invoice number to channel %s: %w", channelID, err)
 	}
 
-	var counterChannelID string
-	for _, channel := range channels {
-		if channel.Name == "invoice-counter" || channel.Name == "invoice_bot_counter" {
-			counterChannelID = channel.ID
-			break
-		}
-	}
-
-	// If no counter channel found, just log and return success
-	if counterChannelID == "" {
-		log.Printf("No invoice counter channel found, skipping counter update")
-		return nil
-	}
-
-	// Post the new invoice number to the counter channel
-	_, _, err = is.slackClient.PostMessageContext(ctx, counterChannelID, slack.MsgOptionText(strconv.Itoa(invoiceNumber), false))
-	if err != nil {
-		return fmt.Errorf("failed to post invoice number to counter channel: %w", err)
-	}
-
+	log.Printf("Updated invoice counter to %d in channel %s", invoiceNumber, channelID)
 	return nil
 }
 
