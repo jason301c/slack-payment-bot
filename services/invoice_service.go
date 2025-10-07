@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"paymentbot/models"
@@ -182,41 +183,67 @@ func (is *InvoiceService) ParseInvoiceDataFromModal(values map[string]map[string
 	invoice.ClientEmail = values["client_email_block"]["client_email_input"].Value
 	invoice.DateDue = values["date_due_block"]["date_due_input"].Value
 
-	// Parse line items
-	for i := 0; i < 10; i++ { // Support up to 10 line items
-		serviceKey := fmt.Sprintf("service_%d", i)
-		priceKey := fmt.Sprintf("unit_price_%d", i)
-		quantityKey := fmt.Sprintf("quantity_%d", i)
+	// Parse line items from the new format
+	lineItemsText := values["line_items_block"]["line_items_input"].Value
+	if lineItemsText == "" {
+		return nil, fmt.Errorf("at least one line item is required")
+	}
 
-		// Check if this line item has data
-		if serviceBlock, exists := values[serviceKey]; exists {
-			serviceDesc := serviceBlock[fmt.Sprintf("service_input_%d", i)].Value
-			if serviceDesc == "" {
-				continue
-			}
-
-			unitPriceStr := values[priceKey][fmt.Sprintf("unit_price_input_%d", i)].Value
-			unitPrice, err := strconv.ParseFloat(unitPriceStr, 64)
-			if err != nil {
-				return nil, fmt.Errorf("invalid unit price for item %d: %v", i+1, err)
-			}
-
-			quantityStr := values[quantityKey][fmt.Sprintf("quantity_input_%d", i)].Value
-			quantity, err := strconv.Atoi(quantityStr)
-			if err != nil || quantity <= 0 {
-				quantity = 1 // Default to 1 if invalid
-			}
-
-			invoice.LineItems = append(invoice.LineItems, models.InvoiceLineItem{
-				ServiceDescription: serviceDesc,
-				UnitPrice:         unitPrice,
-				Quantity:          quantity,
-			})
+	// Split by lines and parse each line item
+	lines := strings.Split(strings.TrimSpace(lineItemsText), "\n")
+	for lineNum, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue // Skip empty lines
 		}
+
+		// Parse line in format: "Service Description | Price | Quantity"
+		parts := strings.Split(line, "|")
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("line %d is not in the correct format. Expected: 'Service | Price | Quantity'", lineNum+1)
+		}
+
+		// Extract service description (everything before the first pipe)
+		serviceDesc := strings.TrimSpace(parts[0])
+		if serviceDesc == "" {
+			return nil, fmt.Errorf("service description on line %d cannot be empty", lineNum+1)
+		}
+
+		// Extract price (second part)
+		var unitPrice float64
+		var err error
+		if len(parts) >= 2 {
+			priceStr := strings.TrimSpace(parts[1])
+			unitPrice, err = strconv.ParseFloat(priceStr, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid price '%s' on line %d: %v", priceStr, lineNum+1, err)
+			}
+		}
+
+		// Extract quantity (third part, optional - defaults to 1)
+		quantity := 1
+		if len(parts) >= 3 {
+			quantityStr := strings.TrimSpace(parts[2])
+			if quantityStr != "" {
+				parsedQuantity, err := strconv.Atoi(quantityStr)
+				if err != nil {
+					return nil, fmt.Errorf("invalid quantity '%s' on line %d: %v", quantityStr, lineNum+1, err)
+				}
+				if parsedQuantity > 0 {
+					quantity = parsedQuantity
+				}
+			}
+		}
+
+		invoice.LineItems = append(invoice.LineItems, models.InvoiceLineItem{
+			ServiceDescription: serviceDesc,
+			UnitPrice:         unitPrice,
+			Quantity:          quantity,
+		})
 	}
 
 	if len(invoice.LineItems) == 0 {
-		return nil, fmt.Errorf("at least one line item is required")
+		return nil, fmt.Errorf("at least one valid line item is required")
 	}
 
 	return invoice, nil

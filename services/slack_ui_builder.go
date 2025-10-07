@@ -140,12 +140,29 @@ func BuildInvoiceModalView(privateMetadata string) slack.ModalViewRequest {
 	dateDueBlock := slack.NewInputBlock("date_due_block", dateDueLabel, nil, dateDueElement)
 	dateDueBlock.Optional = false
 
-	// Line items section header
+	// Line items section with better format
 	lineItemsHeader := slack.NewSectionBlock(
 		newPlainTextBlock("Invoice Line Items"),
 		nil,
 		nil,
 	)
+
+	// Instructions for line items format
+	lineItemsInstructions := slack.NewSectionBlock(
+		nil,
+		[]*slack.TextBlockObject{
+			slack.NewTextBlockObject(slack.MarkdownType, "*Enter each line item on a new line in this format:*\n`Service Description | Price | Quantity`\n\n*Examples:*\n• `Web Development Services | 150.00 | 10`\n• `Design Services | 75.50 | 5`\n• `Consulting | 200.00 | 2`", false, false),
+		},
+		nil,
+	)
+
+	// Multi-line text input for line items
+	lineItemsLabel := newPlainTextBlock("Line Items")
+	lineItemsPlaceholder := newPlainTextBlock("Web Development Services | 150.00 | 10\nDesign Services | 75.50 | 5")
+	lineItemsElement := slack.NewPlainTextInputBlockElement(lineItemsPlaceholder, "line_items_input")
+	lineItemsElement.Multiline = true
+	lineItemsBlock := slack.NewInputBlock("line_items_block", lineItemsLabel, nil, lineItemsElement)
+	lineItemsBlock.Optional = false
 
 	allBlocks := []slack.Block{
 		invoiceNumberBlock,
@@ -153,36 +170,10 @@ func BuildInvoiceModalView(privateMetadata string) slack.ModalViewRequest {
 		clientAddressBlock,
 		clientEmailBlock,
 		dateDueBlock,
-		lineItemsHeader,
 		slack.NewDividerBlock(),
-	}
-
-	// Add 5 line items by default (can be expanded)
-	for i := 0; i < 5; i++ {
-		serviceLabel := newPlainTextBlock(fmt.Sprintf("Service Description %d", i+1))
-		servicePlaceholder := newPlainTextBlock("e.g., Web Development Services")
-		serviceElement := slack.NewPlainTextInputBlockElement(servicePlaceholder, fmt.Sprintf("service_input_%d", i))
-		serviceBlock := slack.NewInputBlock(fmt.Sprintf("service_%d", i), serviceLabel, nil, serviceElement)
-		serviceBlock.Optional = (i > 0) // First item is required
-
-		unitPriceLabel := newPlainTextBlock(fmt.Sprintf("Unit Price %d ($)", i+1))
-		unitPricePlaceholder := newPlainTextBlock("e.g., 150.00")
-		unitPriceElement := slack.NewPlainTextInputBlockElement(unitPricePlaceholder, fmt.Sprintf("unit_price_input_%d", i))
-		unitPriceBlock := slack.NewInputBlock(fmt.Sprintf("unit_price_%d", i), unitPriceLabel, nil, unitPriceElement)
-		unitPriceBlock.Optional = (i > 0) // First item is required
-
-		quantityLabel := newPlainTextBlock(fmt.Sprintf("Quantity %d", i+1))
-		quantityPlaceholder := newPlainTextBlock("e.g., 1")
-		quantityElement := slack.NewPlainTextInputBlockElement(quantityPlaceholder, fmt.Sprintf("quantity_input_%d", i))
-		quantityBlock := slack.NewInputBlock(fmt.Sprintf("quantity_%d", i), quantityLabel, nil, quantityElement)
-		quantityBlock.Optional = (i > 0) // First item is required
-
-		allBlocks = append(allBlocks, serviceBlock, unitPriceBlock, quantityBlock)
-
-		// Add divider between items (except after last one)
-		if i < 4 {
-			allBlocks = append(allBlocks, slack.NewDividerBlock())
-		}
+		lineItemsHeader,
+		lineItemsInstructions,
+		lineItemsBlock,
 	}
 
 	return slack.ModalViewRequest{

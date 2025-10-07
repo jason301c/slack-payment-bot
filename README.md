@@ -122,10 +122,17 @@ You can also run the bot using Docker (recommended for deployment):
   - **Client Address**: Optional address of the client
   - **Client Email**: Email address of the client
   - **Due Date**: Payment due date (e.g., 2024-12-31)
-  - **Line Items**: Up to 5 line items with:
-    - Service Description
-    - Unit Price (in USD)
-    - Quantity
+  - **Line Items**: Dynamic line items using a simple format:
+    ```
+    Service Description | Price | Quantity
+    ```
+    - Each line item goes on a new line
+    - Quantity is optional (defaults to 1)
+    - Examples:
+      - `Web Development Services | 150.00 | 10`
+      - `Design Services | 75.50 | 5`
+      - `Consulting | 200.00 | 2`
+      - `Hosting Fee | 25.00` (quantity defaults to 1)
 - The bot generates a professional PDF invoice and uploads it to Slack
 - The PDF includes:
   - Company header and invoice details
