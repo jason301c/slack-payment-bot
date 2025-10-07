@@ -104,17 +104,26 @@ func BuildPaymentModalView(provider models.PaymentProvider, privateMetadata stri
 	}
 }
 
-func BuildInvoiceModalView(privateMetadata string) slack.ModalViewRequest {
+func BuildInvoiceModalView(privateMetadata string, nextInvoiceNumber int) slack.ModalViewRequest {
 	modalTitle := newPlainTextBlock("Create Invoice")
 	submitText := newPlainTextBlock("Generate Invoice")
 	closeText := newPlainTextBlock("Cancel")
 
-	// Basic invoice fields
-	invoiceNumberLabel := newPlainTextBlock("Invoice Number")
-	invoiceNumberPlaceholder := newPlainTextBlock("e.g., 935")
-	invoiceNumberElement := slack.NewPlainTextInputBlockElement(invoiceNumberPlaceholder, "invoice_number_input")
-	invoiceNumberBlock := slack.NewInputBlock("invoice_number_block", invoiceNumberLabel, nil, invoiceNumberElement)
-	invoiceNumberBlock.Optional = false
+	// Basic invoice fields - show invoice number as display-only with override option
+	invoiceNumberDisplay := slack.NewSectionBlock(
+		slack.NewTextBlockObject(slack.MarkdownType, fmt.Sprintf("*Invoice Number:* `%d`", nextInvoiceNumber), false, false),
+		[]*slack.TextBlockObject{
+			slack.NewTextBlockObject(slack.MarkdownType, "_Auto-assigned invoice number. To override, use the field below._", false, false),
+		},
+		nil,
+	)
+
+	invoiceNumberLabel := newPlainTextBlock("Override Invoice Number (Advanced)")
+	invoiceNumberHint := newPlainTextBlock("⚠️ Only modify if you need a specific invoice number")
+	invoiceNumberElement := slack.NewPlainTextInputBlockElement(nil, "invoice_number_input")
+	invoiceNumberElement.InitialValue = "" // Start empty so users must explicitly enter a number
+	invoiceNumberBlock := slack.NewInputBlock("invoice_number_block", invoiceNumberLabel, invoiceNumberHint, invoiceNumberElement)
+	invoiceNumberBlock.Optional = true // Make the override optional
 
 	clientNameLabel := newPlainTextBlock("Client Name")
 	clientNamePlaceholder := newPlainTextBlock("e.g., Acme Corporation")
@@ -171,6 +180,7 @@ func BuildInvoiceModalView(privateMetadata string) slack.ModalViewRequest {
 	lineItemsBlock.Optional = false
 
 	allBlocks := []slack.Block{
+		invoiceNumberDisplay,
 		invoiceNumberBlock,
 		clientNameBlock,
 		clientAddressBlock,

@@ -44,7 +44,7 @@ func (sh *SlackHandler) HandleSlackCommands(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	log.Printf("Parsed Slack command: command=%s, text=%s, user_id=%s, channel_id=%s", sCmd.Command, sCmd.Text, sCmd.UserID, sCmd.ChannelID)
+	log.Printf("Parsed Slack command: command=%s, text=%s, user_id=%s, channel_id=%s, team_id=%s", sCmd.Command, sCmd.Text, sCmd.UserID, sCmd.ChannelID, sCmd.TeamID)
 
 	var provider models.PaymentProvider
 	switch sCmd.Command {
@@ -54,7 +54,7 @@ func (sh *SlackHandler) HandleSlackCommands(w http.ResponseWriter, r *http.Reque
 		provider = models.ProviderAirwallex
 	case "/create-invoice":
 		// Handle invoice command separately
-		if err := sh.service.OpenInvoiceModal(sCmd.TriggerID, sCmd.ChannelID); err != nil {
+		if err := sh.service.OpenInvoiceModal(sCmd.TriggerID, sCmd.ChannelID, sCmd.TeamID); err != nil {
 			log.Printf("Error opening invoice modal: %v", err)
 			respondToSlack(w, "Error opening invoice form. Please try again.")
 			return

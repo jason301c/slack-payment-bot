@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -198,11 +199,21 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *SlackService) OpenInvoiceModal(triggerID, channelID string) error {
+func (s *SlackService) OpenInvoiceModal(triggerID, channelID, teamID string) error {
 	log.Printf("Opening invoice modal for channel: %s", channelID)
-	modalView := BuildInvoiceModalView(channelID)
 
-	_, err := s.client.OpenView(triggerID, modalView)
+	// Get the next invoice number
+	ctx := context.Background()
+	lastInvoiceNumber, err := s.invoiceService.GetLastInvoiceNumber(ctx, teamID)
+	if err != nil {
+		log.Printf("Error getting last invoice number: %v", err)
+		lastInvoiceNumber = 1000 // fallback
+	}
+	nextInvoiceNumber := lastInvoiceNumber + 1
+
+	modalView := BuildInvoiceModalView(channelID, nextInvoiceNumber)
+
+	_, err = s.client.OpenView(triggerID, modalView)
 	if err != nil {
 		log.Printf("Error opening invoice modal: %v", err)
 		return fmt.Errorf("failed to open invoice modal: %w", err)
@@ -223,10 +234,19 @@ func (s *SlackService) ProcessInvoiceSubmission(w http.ResponseWriter, interacti
 		return
 	}
 
-	// Validate required fields
-	if invoice.InvoiceNumber == "" {
-		respondWithError(w, "invoice_number_block", "Invoice number is required")
-		return
+	// Handle the case where override field is empty - we need to use the auto-generated number
+	overrideInvoiceNumber := values["invoice_number_block"]["invoice_number_input"].Value
+	if strings.TrimSpace(overrideInvoiceNumber) == "" {
+		// No override provided, we need to get the next invoice number
+		ctx := context.Background()
+		lastInvoiceNumber, err := s.invoiceService.GetLastInvoiceNumber(ctx, interaction.Team.ID)
+		if err != nil {
+			log.Printf("Error getting last invoice number: %v", err)
+			respondWithError(w, "", "Error generating invoice number. Please try again or specify a number manually.")
+			return
+		}
+		invoice.InvoiceNumber = strconv.Itoa(lastInvoiceNumber + 1)
+		log.Printf("Using auto-generated invoice number: %s", invoice.InvoiceNumber)
 	}
 	if invoice.ClientName == "" {
 		respondWithError(w, "client_name_block", "Client name is required")
@@ -271,6 +291,21 @@ func (s *SlackService) ProcessInvoiceSubmission(w http.ResponseWriter, interacti
 		log.Printf("Error sending invoice to Slack: %v", err)
 		respondWithError(w, "", fmt.Sprintf("Error sending invoice: %v", err))
 		return
+	}
+
+	// Update the invoice number counter after successful generation
+	ctx := context.Background()
+	invoiceNumInt, err := strconv.Atoi(invoice.InvoiceNumber)
+	if err != nil {
+		log.Printf("Error converting invoice number to int: %v", err)
+	} else {
+		err = s.invoiceService.UpdateLastInvoiceNumber(ctx, interaction.Team.ID, invoiceNumInt)
+		if err != nil {
+			log.Printf("Error updating last invoice number: %v", err)
+			// Don't fail the request if the counter update fails, just log it
+		} else {
+			log.Printf("Successfully updated invoice counter to %d for team %s", invoiceNumInt, interaction.Team.ID)
+		}
 	}
 
 	log.Printf("Successfully generated and sent invoice #%s to user %s in channel %s",
