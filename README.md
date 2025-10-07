@@ -13,9 +13,10 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
 
 2. **Configure Slash Commands**
    - In your app settings, go to **Features > Slash Commands**.
-   - Create two commands:
+   - Create three commands:
      - `/create-airwallex-link` (Request URL: `https://YOUR_PUBLIC_URL/slack/commands`)
      - `/create-stripe-link` (Request URL: `https://YOUR_PUBLIC_URL/slack/commands`)
+     - `/create-invoice` (Request URL: `https://YOUR_PUBLIC_URL/slack/commands`)
    - `YOUR_PUBLIC_URL` should be the URL where your bot server is hosted.
    - **Note:** You no longer provide arguments directly in the slash command. The bot will always open a modal for you to fill in the payment details.
 
@@ -24,6 +25,7 @@ This Slack bot allows you to generate real Airwallex and Stripe payment links di
    - Under **Bot Token Scopes**, add:
      - `chat:write` (required, to post messages as the bot)
      - `commands` (required, to handle slash commands)
+     - `files:write` (required, to upload PDF invoices)
      - `chat:write.public` (optional, to post in public channels the bot isn't a member of)
      - `im:write` (optional, to send DMs to users)
      - `groups:write` (optional, to post in private channels)
@@ -106,8 +108,31 @@ You can also run the bot using Docker (recommended for deployment):
 - In your Slack workspace, use the slash commands:
   - `/create-airwallex-link`
   - `/create-stripe-link`
+  - `/create-invoice`
+
+### Payment Links
 - The bot will open a modal for you to fill in the payment details (amount, service name, reference, and for Stripe, subscription options).
 - After submitting the modal, the bot will respond with a real payment link for the requested provider.
+
+### Invoice Generation
+- Use `/create-invoice` to generate professional PDF invoices
+- The bot will open a modal with the following fields:
+  - **Invoice Number**: Unique identifier for the invoice (e.g., 935)
+  - **Client Name**: Name of the client being billed
+  - **Client Address**: Optional address of the client
+  - **Client Email**: Email address of the client
+  - **Due Date**: Payment due date (e.g., 2024-12-31)
+  - **Line Items**: Up to 5 line items with:
+    - Service Description
+    - Unit Price (in USD)
+    - Quantity
+- The bot generates a professional PDF invoice and uploads it to Slack
+- The PDF includes:
+  - Company header and invoice details
+  - Client billing information
+  - Itemized list of services with prices
+  - Total amount due
+  - Professional formatting and layout
 
 ## Stripe Recurring/Subscription Payments
 You can create recurring (subscription) payment links with Stripe by selecting the subscription options in the modal. The modal will allow you to choose the billing interval and frequency.

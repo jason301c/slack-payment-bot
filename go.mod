@@ -7,4 +7,7 @@ require (
 	github.com/stripe/stripe-go/v82 v82.0.0
 )
 
-require github.com/gorilla/websocket v1.4.2 // indirect
+require (
+	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/jung-kurt/gofpdf v1.16.2 // indirect
+)

@@ -52,6 +52,15 @@ func (sh *SlackHandler) HandleSlackCommands(w http.ResponseWriter, r *http.Reque
 		provider = models.ProviderStripe
 	case "/create-airwallex-link":
 		provider = models.ProviderAirwallex
+	case "/create-invoice":
+		// Handle invoice command separately
+		if err := sh.service.OpenInvoiceModal(sCmd.TriggerID, sCmd.ChannelID); err != nil {
+			log.Printf("Error opening invoice modal: %v", err)
+			respondToSlack(w, "Error opening invoice form. Please try again.")
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		return
 	default:
 		respondToSlack(w, fmt.Sprintf("Unknown command: %s", sCmd.Command))
 		return
@@ -78,7 +87,11 @@ func (sh *SlackHandler) HandleSlackInteractions(w http.ResponseWriter, r *http.R
 
 	switch interaction.Type {
 	case slack.InteractionTypeViewSubmission:
-		sh.service.ProcessModalSubmission(w, &interaction)
+		if interaction.View.CallbackID == "invoice_modal" {
+			sh.service.ProcessInvoiceSubmission(w, &interaction)
+		} else {
+			sh.service.ProcessModalSubmission(w, &interaction)
+		}
 	default:
 		log.Printf("Unhandled interaction type: %s", interaction.Type)
 		w.WriteHeader(http.StatusOK)

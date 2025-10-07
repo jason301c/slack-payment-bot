@@ -19,3 +19,20 @@ const (
 	ProviderStripe    PaymentProvider = "stripe"
 	ProviderAirwallex PaymentProvider = "airwallex"
 )
+
+// InvoiceData represents the data needed to create an invoice
+type InvoiceData struct {
+	InvoiceNumber    string            `json:"invoice_number"`
+	ClientName       string            `json:"client_name"`
+	ClientAddress    string            `json:"client_address"`
+	ClientEmail      string            `json:"client_email"`
+	DateDue          string            `json:"date_due"`
+	LineItems        []InvoiceLineItem `json:"line_items"`
+}
+
+// InvoiceLineItem represents a line item in an invoice
+type InvoiceLineItem struct {
+	ServiceDescription string  `json:"service_description"`
+	UnitPrice         float64 `json:"unit_price"`
+	Quantity          int     `json:"quantity"`
+}

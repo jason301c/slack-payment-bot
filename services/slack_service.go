@@ -21,14 +21,19 @@ type SlackService struct {
 	signingSecret      string
 	stripeGenerator    payment.PaymentLinkGenerator
 	airwallexGenerator payment.PaymentLinkGenerator
+	invoiceService     *InvoiceService
 }
 
 func NewSlackService(cfg *config.Config, stripeGen payment.PaymentLinkGenerator, airwallexGen payment.PaymentLinkGenerator) *SlackService {
+	client := slack.New(cfg.SlackBotToken)
+	invoiceService := NewInvoiceService(client)
+
 	return &SlackService{
-		client:             slack.New(cfg.SlackBotToken),
+		client:             client,
 		signingSecret:      cfg.SlackSigningSecret,
 		stripeGenerator:    stripeGen,
 		airwallexGenerator: airwallexGen,
+		invoiceService:     invoiceService,
 	}
 }
 
@@ -190,6 +195,83 @@ func (s *SlackService) ProcessModalSubmission(w http.ResponseWriter, interaction
 
 	log.Printf("Sending payment link message to user: %s, channel: %s, payment link: %s, payment ID: %s, provider: %s", interaction.User.ID, channelID, paymentLink, paymentID, provider)
 	s.SendPaymentLinkMessage(interaction.User.ID, channelID, paymentData, paymentLink, paymentID, provider)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *SlackService) OpenInvoiceModal(triggerID, channelID string) error {
+	log.Printf("Opening invoice modal for channel: %s", channelID)
+	modalView := BuildInvoiceModalView(channelID)
+
+	_, err := s.client.OpenView(triggerID, modalView)
+	if err != nil {
+		log.Printf("Error opening invoice modal: %v", err)
+		return fmt.Errorf("failed to open invoice modal: %w", err)
+	}
+	return nil
+}
+
+func (s *SlackService) ProcessInvoiceSubmission(w http.ResponseWriter, interaction *slack.InteractionCallback) {
+	log.Printf("Handling invoice modal submission")
+
+	values := interaction.View.State.Values
+
+	// Parse invoice data from modal
+	invoice, err := s.invoiceService.ParseInvoiceDataFromModal(values)
+	if err != nil {
+		log.Printf("Error parsing invoice data: %v", err)
+		respondWithError(w, "", fmt.Sprintf("Error parsing invoice data: %v", err))
+		return
+	}
+
+	// Validate required fields
+	if invoice.InvoiceNumber == "" {
+		respondWithError(w, "invoice_number_block", "Invoice number is required")
+		return
+	}
+	if invoice.ClientName == "" {
+		respondWithError(w, "client_name_block", "Client name is required")
+		return
+	}
+	if invoice.ClientEmail == "" {
+		respondWithError(w, "client_email_block", "Client email is required")
+		return
+	}
+	if invoice.DateDue == "" {
+		respondWithError(w, "date_due_block", "Due date is required")
+		return
+	}
+
+	// Generate PDF
+	pdfBytes, err := s.invoiceService.GenerateInvoicePDF(invoice)
+	if err != nil {
+		log.Printf("Error generating invoice PDF: %v", err)
+		respondWithError(w, "", fmt.Sprintf("Error generating invoice PDF: %v", err))
+		return
+	}
+
+	// Get channel ID
+	channelID := interaction.Channel.ID
+	if channelID == "" {
+		// Try to get channel from private metadata
+		if interaction.View.PrivateMetadata != "" {
+			channelID = interaction.View.PrivateMetadata
+		} else {
+			// Fallback to DM the user if no channel context is available
+			channelID = interaction.User.ID
+		}
+	}
+
+	// Send invoice to Slack
+	err = s.invoiceService.SendInvoiceToSlack(interaction.User.ID, channelID, invoice, pdfBytes)
+	if err != nil {
+		log.Printf("Error sending invoice to Slack: %v", err)
+		respondWithError(w, "", fmt.Sprintf("Error sending invoice: %v", err))
+		return
+	}
+
+	log.Printf("Successfully generated and sent invoice #%s to user %s in channel %s",
+		invoice.InvoiceNumber, interaction.User.ID, channelID)
+
 	w.WriteHeader(http.StatusOK)
 }
 
