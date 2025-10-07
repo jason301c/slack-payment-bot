@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -38,6 +39,25 @@ func getCurrencySymbol(currency string) string {
 		return symbol
 	}
 	return "$" // Default to USD symbol
+}
+
+func (is *InvoiceService) uploadFileToSlack(ctx context.Context, filename string, fileBytes []byte, channelID string, initialComment string) error {
+	// Use UploadFileV2 with the new API
+	params := slack.UploadFileV2Parameters{
+		Reader:         bytes.NewReader(fileBytes),
+		Filename:       filename,
+		Title:          filename,
+		FileSize:       len(fileBytes),
+		InitialComment: initialComment,
+		Channel:        channelID,
+	}
+
+	_, err := is.slackClient.UploadFileV2Context(ctx, params)
+	if err != nil {
+		return fmt.Errorf("failed to upload file: %w", err)
+	}
+
+	return nil
 }
 
 func (is *InvoiceService) GenerateInvoicePDF(invoice *models.InvoiceData) ([]byte, error) {
@@ -193,38 +213,35 @@ func (is *InvoiceService) SendInvoiceToSlack(userID, channelID string, invoice *
 	}
 
 	// Create message
+	currencySymbol := getCurrencySymbol(invoice.Currency)
 	message := fmt.Sprintf(
-		"📄 *Invoice #%s* for *%s*\n\n*Amount Due:* $%.2f\n*Due Date:* %s\n*Email:* %s\n\nPlease find the PDF invoice attached.",
-		invoice.InvoiceNumber, invoice.ClientName, total, invoice.DateDue, invoice.ClientEmail,
+		"📄 *Invoice #%s* for *%s*\n\n*Amount Due:* %s%.2f\n*Due Date:* %s\n*Email:* %s\n\nPlease find the PDF invoice attached.",
+		invoice.InvoiceNumber, invoice.ClientName, currencySymbol, total, invoice.DateDue, invoice.ClientEmail,
 	)
 
-	// Upload PDF to Slack
-	uploadParams := slack.FileUploadParameters{
-		Reader:         bytes.NewReader(pdfBytes),
-		Filename:       fmt.Sprintf("Invoice_%s.pdf", invoice.InvoiceNumber),
-		Title:          fmt.Sprintf("Invoice %s", invoice.InvoiceNumber),
-		Filetype:       "pdf",
-		Channels:       []string{channelID},
-		InitialComment: message,
-	}
+	filename := fmt.Sprintf("Invoice_%s.pdf", invoice.InvoiceNumber)
+	ctx := context.Background()
 
-	_, err := is.slackClient.UploadFile(uploadParams)
+	// Upload PDF to channel
+	err := is.uploadFileToSlack(ctx, filename, pdfBytes, channelID, message)
 	if err != nil {
 		log.Printf("Error uploading invoice to channel %s: %v", channelID, err)
 
 		// Fallback: send to user's DM with debug note
 		debugMessage := message + fmt.Sprintf("\n\n:warning: _This file was not sent to the channel because of: %v. Perhaps add the bot to the channel?_", err)
-		dmUploadParams := slack.FileUploadParameters{
-			Reader:         bytes.NewReader(pdfBytes),
-			Filename:       fmt.Sprintf("Invoice_%s.pdf", invoice.InvoiceNumber),
-			Title:          fmt.Sprintf("Invoice %s", invoice.InvoiceNumber),
-			Filetype:       "pdf",
-			InitialComment: debugMessage,
+
+		// Open DM channel with user
+		dmChannel, _, _, dmErr := is.slackClient.OpenConversationContext(ctx, &slack.OpenConversationParameters{
+			Users: []string{userID},
+		})
+		if dmErr != nil {
+			return fmt.Errorf("failed to open DM channel: %v (original upload error: %v)", dmErr, err)
 		}
 
-		_, dmErr := is.slackClient.UploadFile(dmUploadParams)
-		if dmErr != nil {
-			return fmt.Errorf("failed to upload invoice to both channel and DM: %v (channel error: %v)", dmErr, err)
+		// Upload to DM
+		err = is.uploadFileToSlack(ctx, filename, pdfBytes, dmChannel.ID, debugMessage)
+		if err != nil {
+			return fmt.Errorf("failed to upload invoice to both channel and DM: %v (channel error: %v)", err, err)
 		}
 	}
 

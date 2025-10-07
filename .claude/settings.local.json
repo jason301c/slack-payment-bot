@@ -4,7 +4,8 @@
       "Bash(git add:*)",
       "Bash(go get:*)",
       "Bash(go run:*)",
-      "Bash(go build:*)"
+      "Bash(go build:*)",
+      "Bash(go doc:*)"
     ],
     "deny": []
   }
