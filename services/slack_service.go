@@ -240,6 +240,10 @@ func (s *SlackService) ProcessInvoiceSubmission(w http.ResponseWriter, interacti
 		respondWithError(w, "date_due_block", "Due date is required")
 		return
 	}
+	if invoice.Currency == "" {
+		respondWithError(w, "currency_block", "Currency is required")
+		return
+	}
 
 	// Generate PDF
 	pdfBytes, err := s.invoiceService.GenerateInvoicePDF(invoice)

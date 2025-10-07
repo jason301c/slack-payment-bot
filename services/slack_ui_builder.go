@@ -140,6 +140,12 @@ func BuildInvoiceModalView(privateMetadata string) slack.ModalViewRequest {
 	dateDueBlock := slack.NewInputBlock("date_due_block", dateDueLabel, nil, dateDueElement)
 	dateDueBlock.Optional = false
 
+	currencyLabel := newPlainTextBlock("Currency")
+	currencyPlaceholder := newPlainTextBlock("e.g., USD, EUR, HKD")
+	currencyElement := slack.NewPlainTextInputBlockElement(currencyPlaceholder, "currency_input")
+	currencyBlock := slack.NewInputBlock("currency_block", currencyLabel, nil, currencyElement)
+	currencyBlock.Optional = false
+
 	// Line items section with better format
 	lineItemsHeader := slack.NewSectionBlock(
 		newPlainTextBlock("Invoice Line Items"),
@@ -170,6 +176,7 @@ func BuildInvoiceModalView(privateMetadata string) slack.ModalViewRequest {
 		clientAddressBlock,
 		clientEmailBlock,
 		dateDueBlock,
+		currencyBlock,
 		slack.NewDividerBlock(),
 		lineItemsHeader,
 		lineItemsInstructions,

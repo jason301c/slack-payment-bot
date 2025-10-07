@@ -24,74 +24,112 @@ func NewInvoiceService(slackClient *slack.Client) *InvoiceService {
 	}
 }
 
+func getCurrencySymbol(currency string) string {
+	symbols := map[string]string{
+		"USD": "$",
+		"EUR": "€",
+		"GBP": "£",
+		"JPY": "¥",
+		"HKD": "HK$",
+		"CAD": "C$",
+		"AUD": "A$",
+	}
+	if symbol, exists := symbols[currency]; exists {
+		return symbol
+	}
+	return "$" // Default to USD symbol
+}
+
 func (is *InvoiceService) GenerateInvoicePDF(invoice *models.InvoiceData) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 
 	// Set font
-	pdf.SetFont("Arial", "", 12)
+	pdf.SetFont("Arial", "", 10)
 
-	// Company header
-	pdf.SetFont("Arial", "B", 20)
+	// Company Information (left side)
+	pdf.SetFont("Arial", "B", 16)
+	pdf.Cell(0, 8, "ZEFI ECOMMERCE LIMITED")
+	pdf.Ln(6)
+
+	pdf.SetFont("Arial", "", 9)
+	pdf.Cell(0, 5, "Glenealy Central")
+	pdf.Ln(4)
+	pdf.Cell(0, 5, "Unit 2A, 17/F, Glenealy Tower, No.1 Hong Kong")
+	pdf.Ln(4)
+	pdf.Cell(0, 5, "+61 466 598 489")
+	pdf.Ln(15)
+
+	// Invoice title and number (right side)
+	pdf.SetFont("Arial", "B", 24)
 	pdf.Cell(0, 10, "INVOICE")
 	pdf.Ln(15)
 
-	// Invoice number and date
-	pdf.SetFont("Arial", "", 12)
-	pdf.Cell(95, 8, fmt.Sprintf("Invoice Number: %s", invoice.InvoiceNumber))
-	pdf.Cell(95, 8, fmt.Sprintf("Date: %s", time.Now().Format("January 2, 2006")))
-	pdf.Ln(8)
-	pdf.Cell(95, 8, fmt.Sprintf("Due Date: %s", invoice.DateDue))
-	pdf.Ln(20)
+	// Invoice details
+	pdf.SetFont("Arial", "", 10)
+	pdf.Cell(60, 6, fmt.Sprintf("Invoice Number: %s", invoice.InvoiceNumber))
+	pdf.Cell(60, 6, fmt.Sprintf("Date: %s", time.Now().Format("January 2, 2006")))
+	pdf.Ln(6)
+	pdf.Cell(60, 6, fmt.Sprintf("Due Date: %s", invoice.DateDue))
+	pdf.Cell(60, 6, fmt.Sprintf("Currency: %s", invoice.Currency))
+	pdf.Ln(15)
 
 	// Bill To section
-	pdf.SetFont("Arial", "B", 14)
+	pdf.SetFont("Arial", "B", 12)
 	pdf.Cell(0, 8, "Bill To:")
-	pdf.Ln(8)
-
-	pdf.SetFont("Arial", "", 12)
-	pdf.Cell(0, 6, invoice.ClientName)
 	pdf.Ln(6)
+
+	pdf.SetFont("Arial", "", 10)
+	pdf.Cell(0, 5, invoice.ClientName)
+	pdf.Ln(5)
 	if invoice.ClientAddress != "" {
-		pdf.Cell(0, 6, invoice.ClientAddress)
-		pdf.Ln(6)
+		pdf.Cell(0, 5, invoice.ClientAddress)
+		pdf.Ln(5)
 	}
 	if invoice.ClientEmail != "" {
-		pdf.Cell(0, 6, invoice.ClientEmail)
+		pdf.Cell(0, 5, invoice.ClientEmail)
 		pdf.Ln(15)
 	} else {
-		pdf.Ln(9)
+		pdf.Ln(10)
 	}
 
 	// Table headers
-	pdf.SetFont("Arial", "B", 12)
-	pdf.Cell(100, 10, "Description")
-	pdf.Cell(30, 10, "Quantity")
-	pdf.Cell(60, 10, "Price")
+	pdf.SetFont("Arial", "B", 11)
+	pdf.SetFillColor(240, 240, 240)
+	pdf.Cell(100, 8, "Description")
+	pdf.Cell(25, 8, "Qty")
+	pdf.Cell(35, 8, "Unit Price")
+	pdf.Cell(40, 8, "Amount")
 	pdf.Ln(10)
 
 	// Table line
+	pdf.SetDrawColor(200, 200, 200)
 	pdf.Line(10, pdf.GetY(), 200, pdf.GetY())
 	pdf.Ln(5)
 
 	// Line items
-	pdf.SetFont("Arial", "", 12)
-	var total float64
+	pdf.SetFont("Arial", "", 10)
+	var subtotal float64
 	for i, item := range invoice.LineItems {
 		// Description
-		pdf.Cell(100, 8, item.ServiceDescription)
+		pdf.Cell(100, 6, item.ServiceDescription)
 
 		// Quantity
 		quantity := fmt.Sprintf("%d", item.Quantity)
-		pdf.Cell(30, 8, quantity)
+		pdf.Cell(25, 6, quantity)
 
-		// Price
+		// Unit Price
+		currencySymbol := getCurrencySymbol(invoice.Currency)
+		unitPriceStr := fmt.Sprintf("%s%.2f", currencySymbol, item.UnitPrice)
+		pdf.Cell(35, 6, unitPriceStr)
+
+		// Amount (qty * unit price)
 		lineTotal := float64(item.Quantity) * item.UnitPrice
-		price := fmt.Sprintf("$%.2f", lineTotal)
-		pdf.Cell(60, 8, price)
-		pdf.Ln(8)
+		amountStr := fmt.Sprintf("%s%.2f", currencySymbol, lineTotal)
+		pdf.Cell(40, 6, amountStr)
+		pdf.Ln(6)
 
-		total += lineTotal
+		subtotal += lineTotal
 
 		// Add spacing between items
 		if i < len(invoice.LineItems)-1 {
@@ -99,21 +137,43 @@ func (is *InvoiceService) GenerateInvoicePDF(invoice *models.InvoiceData) ([]byt
 		}
 	}
 
-	// Total line
-	pdf.Ln(10)
-	pdf.Line(10, pdf.GetY(), 200, pdf.GetY())
+	// Totals section
+	pdf.Ln(15)
+
+	// Create a box for totals
+	pdf.SetDrawColor(200, 200, 200)
+	pdf.Rect(110, pdf.GetY(), 90, 40, "D")
+
+	// Subtotal
+	pdf.SetFont("Arial", "", 10)
+	pdf.SetX(115)
+	pdf.Cell(35, 12, "Subtotal:")
+	currencySymbol := getCurrencySymbol(invoice.Currency)
+	pdf.Cell(40, 12, fmt.Sprintf("%s%.2f", currencySymbol, subtotal))
+	pdf.Ln(12)
+
+	// Add subtle line
+	pdf.SetDrawColor(220, 220, 220)
+	pdf.Line(115, pdf.GetY(), 195, pdf.GetY())
 	pdf.Ln(5)
 
-	pdf.SetFont("Arial", "B", 14)
-	pdf.Cell(130, 10, "Total:")
-	pdf.Cell(60, 10, fmt.Sprintf("$%.2f", total))
-	pdf.Ln(20)
+	// Total
+	pdf.SetFont("Arial", "B", 12)
+	pdf.SetX(115)
+	pdf.Cell(35, 12, "Total:")
+	pdf.Cell(40, 12, fmt.Sprintf("%s%.2f", currencySymbol, subtotal))
+	pdf.Ln(12)
 
-	// Footer notes
-	pdf.SetFont("Arial", "I", 10)
-	pdf.Cell(0, 8, "Thank you for your business!")
-	pdf.Ln(6)
-	pdf.Cell(0, 8, "Payment is due within 30 days.")
+	// Amount Due - make it stand out
+	pdf.SetFillColor(245, 245, 245)
+	pdf.Rect(110, pdf.GetY(), 90, 15, "F")
+	pdf.SetFont("Arial", "B", 14)
+	pdf.SetX(115)
+	pdf.Cell(35, 15, "Amount Due:")
+	pdf.SetTextColor(0, 100, 0) // Dark green color
+	pdf.Cell(40, 15, fmt.Sprintf("%s%.2f", currencySymbol, subtotal))
+	pdf.SetTextColor(0, 0, 0) // Reset to black
+	pdf.Ln(20)
 
 	// Generate PDF bytes
 	var buf bytes.Buffer
@@ -140,12 +200,12 @@ func (is *InvoiceService) SendInvoiceToSlack(userID, channelID string, invoice *
 
 	// Upload PDF to Slack
 	uploadParams := slack.FileUploadParameters{
-		Reader:          bytes.NewReader(pdfBytes),
-		Filename:        fmt.Sprintf("Invoice_%s.pdf", invoice.InvoiceNumber),
-		Title:           fmt.Sprintf("Invoice %s", invoice.InvoiceNumber),
-		Filetype:        "pdf",
-		Channels:        []string{channelID},
-		InitialComment:  message,
+		Reader:         bytes.NewReader(pdfBytes),
+		Filename:       fmt.Sprintf("Invoice_%s.pdf", invoice.InvoiceNumber),
+		Title:          fmt.Sprintf("Invoice %s", invoice.InvoiceNumber),
+		Filetype:       "pdf",
+		Channels:       []string{channelID},
+		InitialComment: message,
 	}
 
 	_, err := is.slackClient.UploadFile(uploadParams)
@@ -182,6 +242,14 @@ func (is *InvoiceService) ParseInvoiceDataFromModal(values map[string]map[string
 	invoice.ClientAddress = values["client_address_block"]["client_address_input"].Value
 	invoice.ClientEmail = values["client_email_block"]["client_email_input"].Value
 	invoice.DateDue = values["date_due_block"]["date_due_input"].Value
+
+	// Parse currency (default to USD)
+	if currencyBlock, exists := values["currency_block"]; exists {
+		invoice.Currency = strings.ToUpper(strings.TrimSpace(currencyBlock["currency_input"].Value))
+	}
+	if invoice.Currency == "" {
+		invoice.Currency = "USD"
+	}
 
 	// Parse line items from the new format
 	lineItemsText := values["line_items_block"]["line_items_input"].Value
@@ -237,8 +305,8 @@ func (is *InvoiceService) ParseInvoiceDataFromModal(values map[string]map[string
 
 		invoice.LineItems = append(invoice.LineItems, models.InvoiceLineItem{
 			ServiceDescription: serviceDesc,
-			UnitPrice:         unitPrice,
-			Quantity:          quantity,
+			UnitPrice:          unitPrice,
+			Quantity:           quantity,
 		})
 	}
 

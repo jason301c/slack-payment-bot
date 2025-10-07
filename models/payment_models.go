@@ -27,6 +27,7 @@ type InvoiceData struct {
 	ClientAddress    string            `json:"client_address"`
 	ClientEmail      string            `json:"client_email"`
 	DateDue          string            `json:"date_due"`
+	Currency         string            `json:"currency"` // e.g., "USD", "EUR", "HKD"
 	LineItems        []InvoiceLineItem `json:"line_items"`
 }
 
