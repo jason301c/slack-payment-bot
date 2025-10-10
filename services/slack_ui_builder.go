@@ -179,6 +179,15 @@ func BuildInvoiceModalView(privateMetadata string, nextInvoiceNumber int) slack.
 	lineItemsBlock := slack.NewInputBlock("line_items_block", lineItemsLabel, nil, lineItemsElement)
 	lineItemsBlock.Optional = false
 
+	// Notes section
+	notesLabel := newPlainTextBlock("Notes (Optional)")
+	notesPlaceholder := newPlainTextBlock("Add any additional notes or payment instructions here...")
+	notesHint := newPlainTextBlock("These notes will appear near the bottom of the invoice PDF.")
+	notesElement := slack.NewPlainTextInputBlockElement(notesPlaceholder, "notes_input")
+	notesElement.Multiline = true
+	notesBlock := slack.NewInputBlock("notes_block", notesLabel, notesHint, notesElement)
+	notesBlock.Optional = true
+
 	allBlocks := []slack.Block{
 		invoiceNumberDisplay,
 		invoiceNumberBlock,
@@ -191,6 +200,8 @@ func BuildInvoiceModalView(privateMetadata string, nextInvoiceNumber int) slack.
 		lineItemsHeader,
 		lineItemsInstructions,
 		lineItemsBlock,
+		slack.NewDividerBlock(),
+		notesBlock,
 	}
 
 	return slack.ModalViewRequest{

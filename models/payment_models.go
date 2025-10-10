@@ -29,6 +29,7 @@ type InvoiceData struct {
 	DateDue          string            `json:"date_due"`
 	Currency         string            `json:"currency"` // e.g., "USD", "EUR", "HKD"
 	LineItems        []InvoiceLineItem `json:"line_items"`
+	Notes            string            `json:"notes"` // Optional notes to display near the bottom of the PDF
 }
 
 // InvoiceLineItem represents a line item in an invoice

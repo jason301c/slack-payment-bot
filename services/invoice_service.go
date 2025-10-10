@@ -235,6 +235,20 @@ func (is *InvoiceService) GenerateInvoicePDF(invoice *models.InvoiceData) ([]byt
 	pdf.SetTextColor(0, 0, 0) // Reset to black
 	pdf.Ln(20)
 
+	// Add notes section if notes are provided
+	if invoice.Notes != "" {
+		pdf.Ln(10)
+		pdf.SetFont("Arial", "B", 11)
+		pdf.Cell(0, 6, "Notes:")
+		pdf.Ln(6)
+		pdf.SetFont("Arial", "", 10)
+		
+		// Split notes into lines and add them
+		// Use MultiCell for automatic line wrapping
+		pdf.MultiCell(0, 5, invoice.Notes, "", "L", false)
+		pdf.Ln(5)
+	}
+
 	// Generate PDF bytes
 	var buf bytes.Buffer
 	err := pdf.Output(&buf)
@@ -309,6 +323,11 @@ func (is *InvoiceService) ParseInvoiceDataFromModal(values map[string]map[string
 	}
 	if invoice.Currency == "" {
 		invoice.Currency = "USD"
+	}
+
+	// Parse notes (optional)
+	if notesBlock, exists := values["notes_block"]; exists {
+		invoice.Notes = strings.TrimSpace(notesBlock["notes_input"].Value)
 	}
 
 	// Parse line items from the new format
